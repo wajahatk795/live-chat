@@ -30,8 +30,8 @@
         sessionStorage.setItem("chat_session_id", SESSION_ID);
     }
 
-    const PUSHER_KEY = "b28141d4a8de8eb2e3ed";
-    const PUSHER_CLUSTER = "ap2";
+    const PUSHER_KEY = "cb8bbfac1fbb781fcaa7";
+    const PUSHER_CLUSTER = "mt1";
     const API_URL = `${BASE_URL}/api/visitor-message`;
 
     const emojiScript = document.createElement("script");
