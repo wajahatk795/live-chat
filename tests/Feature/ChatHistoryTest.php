@@ -165,6 +165,7 @@ class ChatHistoryTest extends TestCase
             ->get(route('admin.chat', [], false))
             ->assertOk()
             ->assertSee('data-name="Online Visitor"', false)
+            ->assertSee('href="' . route('admin.chat', ['chatId' => $onlineChat->id]) . '"', false)
             ->assertSee('data-name="Recently Online Visitor"', false)
             ->assertSee('Latest visitor preview')
             ->assertDontSee('Older visitor preview')

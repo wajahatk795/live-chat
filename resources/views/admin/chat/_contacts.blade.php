@@ -13,7 +13,11 @@
 
         <li class="chat-contact-list-item mb-1 {{ request('chatId') == $chat->id ? 'active' : '' }}">
             <a class="d-flex align-items-center chat-user"
-                href="{{ route('admin.chat.show', $chat->id) }}{{ $isPastChat ? '?past=1' : '' }}"
+                href="{{ route('admin.chat', array_filter([
+                    'view' => $historyView ? 'history' : null,
+                    'chatId' => $chat->id,
+                    'past' => $isPastChat ? 1 : null,
+                ])) }}"
                 data-chat-id="{{ $chat->id }}"
                 data-is-past-chat="{{ $isPastChat ? 'true' : 'false' }}"
                 data-presence="{{ $isOnline ? 'online' : 'offline' }}"

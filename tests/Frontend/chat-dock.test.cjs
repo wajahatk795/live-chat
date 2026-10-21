@@ -486,7 +486,9 @@ test('selecting a past chat opens its read-only full-history view', () => {
     assert.match(messagesView, /id="load-more-btn"/);
     const contactsView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat', '_contacts.blade.php'), 'utf8');
     assert.match(contactsView, /data-is-past-chat="{{ \$isPastChat \? 'true' : 'false' }}"/);
-    assert.match(contactsView, /\$isPastChat \? '\?past=1' : ''/);
+    assert.match(contactsView, /href="\{\{ route\('admin\.chat', array_filter\(\[/);
+    assert.match(contactsView, /'chatId' => \$chat->id/);
+    assert.match(contactsView, /'past' => \$isPastChat \? 1 : null/);
     assert.match(contactsView, /\$chat->isPastConversation\(now\(\)->subWeek\(\)\)/);
 });
 

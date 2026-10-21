@@ -84,7 +84,7 @@ class AdminController extends Controller
         $chats = $this->chatListQuery($historyView)->get();
 
         $messages = collect();
-        $chatId = null;
+        $chatId = request()->query('chatId');
 
         return view('admin.chat', compact('messages', 'chatId', 'chats', 'historyView'));
     }
