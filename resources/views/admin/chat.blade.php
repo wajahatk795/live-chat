@@ -433,87 +433,7 @@
                     </div>
                     <div class="sidebar-body ps ps--active-y">
                         <!-- Chats -->
-                        <ul class="list-unstyled chat-contact-list py-2 mb-0" id="chat-list">
-                            <li class="chat-contact-list-item chat-contact-list-item-title mt-0">
-                                <h5 class="text-primary mb-0">Chats</h5>
-                            </li>
-                            @forelse ($chats as $chat)
-                                @php
-                                    $count = $chat->messages()->where('is_read', false)->where('sender', '!=', auth()->id())->count();
-                                    $lastMessage = $chat->messages()
-                                        ->whereNotNull('sender')
-                                        ->latest()
-                                        ->value('message');
-                                @endphp
-
-                                <li class="chat-contact-list-item mb-1 {{ request('chatId') == $chat->id ? 'active' : '' }}">
-
-                                    <a class="d-flex align-items-center chat-user"
-                                        href="{{ route('admin.chat.show', $chat->id) }}"
-                                        data-chat-id="{{ $chat->id }}"
-                                        data-user-id="{{ $chat->visitor->id }}"
-                                        data-visitor-id="{{ $chat->main_visitor->id ?? '' }}"
-                                        data-chat-status="{{ $chat->status }}"
-                                        data-name="{{ $chat->visitor->name }}"
-                                        data-email="{{ $chat->visitor->email }}"
-                                        data-phone="{{ $chat->visitor->phone ?? '-' }}"
-                                        data-role="{{ $chat->visitor->isRole() ?? 'User' }}"
-                                        data-ipaddress="{{ $chat->main_visitor->ip_address ?? '-' }}"
-                                        data-country="{{ $chat->main_visitor->country ?? '-' }}"
-                                        data-city="{{ $chat->main_visitor->city ?? '-' }}"
-                                        data-device="{{ $chat->main_visitor->device ?? '-' }}"
-                                        data-browser="{{ $chat->main_visitor->browser ?? '-' }}"
-                                        data-os="{{ $chat->main_visitor->os ?? '-' }}"
-                                        data-country-code="{{ $chat->main_visitor->country_code ?? '' }}"
-                                        data-avatar="{{ $chat->visitor->image ? asset($chat->visitor->image) : asset('assets/images/default.png') }}">
-
-                                        <div class="flex-shrink-0 avatar avatar-online profile-av-1">
-                                            @if(preg_match('/^[A-Za-z]{2}$/', (string) ($chat->main_visitor->country_code ?? '')))
-                                                <img src="https://flagcdn.com/w40/{{ strtolower($chat->main_visitor->country_code) }}.png"
-                                                    alt="{{ $chat->main_visitor->country ?? 'Visitor country' }} flag"
-                                                    class="rounded-circle visitor-country-flag">
-                                            @else
-                                                <img src="{{ $chat->visitor->image ? asset($chat->visitor->image) : asset('assets/images/default.png')  }}"
-                                                    alt="Avatar"
-                                                    class="rounded-circle">
-                                            @endif
-                                        </div>
-
-                                        <div class="chat-contact-info flex-grow-1 ms-4">
-
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <h6 class="chat-contact-name text-truncate m-0 fw-normal">
-                                                    {{ $chat->visitor->name }}
-                                                </h6>
-
-                                                @if(in_array(auth()->user()->role, [1, 2]))
-                                                    <span class="badge bg-danger ms-2 unread-badge"
-                                                        style="display: {{ $count > 0 ? 'inline-block' : 'none' }}">
-                                                        {{ $count }}
-                                                    </span>
-                                                @endif
-
-                                                <small class="chat-contact-list-item-time">
-                                                    {{ optional($chat->updated_at)->diffForHumans() }}
-                                                </small>
-                                            </div>
-
-                                            <small class="chat-contact-status text-truncate last-message">
-                                                {{ $lastMessage ?? 'No messages yet' }}
-                                            </small>
-
-                                        </div>
-                                    </a>
-
-                                </li>
-
-                            @empty
-                                <li class="chat-contact-list-item chat-list-item-0">
-                                    <h6 class="text-body-secondary mb-0">No Chats Found</h6>
-                                </li>
-                            @endforelse
-
-                        </ul>
+                        @include('admin.chat._contacts')
                         <div class="ps__rail-x" style="left: 0px; bottom: 0px;">
                             <div class="ps__thumb-x" tabindex="0" style="left: 0px; width: 0px;"></div>
                         </div>
@@ -734,14 +654,86 @@ let lastPage = null;
 let lastMessageId = null;
 const openChatTabs = new Map();
 const boundChatChannels = new Set();
+const boundSidebarChannels = new Set();
 let activeChatRequest = 0;
 let messageRequestId = 0;
 let currentInboxChatId = null;
+let currentInboxVisitorId = null;
 let profileRequestId = 0;
 const profileRoute = "{{ route('admin.chat.profile', ':id') }}";
 const profileUpdateRoute = "{{ route('admin.chat.profile.update', ':id') }}";
+const chatContactsUrl = @json(route('admin.chat.contacts'));
+const historyView = @json($historyView);
+const currentUserRole = @json((int) auth()->user()->role);
+const authorizedBrandIds = @json(auth()->user()->role == 1 ? [] : auth()->user()->auth_brands->pluck('id')->values());
+
+function subscribeSidebarChat(element) {
+    const id = element.dataset.chatId;
+    if (!id || boundSidebarChannels.has(id)) return;
+
+    boundSidebarChannels.add(id);
+    pusherChat.subscribe(`chat.${id}`).bind('new-message', data => {
+        if (data.role != 3) return;
+
+        if (!isChatActive(id)) {
+            const badge = getUnreadBadge(id);
+            if (badge) {
+                badge.innerText = parseInt(badge.innerText || 0) + 1;
+                badge.style.display = 'inline-block';
+            }
+            notifySound.currentTime = 0;
+            notifySound.play().catch(() => {});
+        } else {
+            markMessagesRead(id);
+        }
+
+        updateLastMessage(id, data.message);
+    });
+}
+
+async function refreshChatContacts() {
+    if (document.visibilityState === 'hidden') return;
+
+    const currentList = document.getElementById('chat-list');
+    if (!currentList) return;
+
+    const activeId = currentList.querySelector('.chat-contact-list-item.active .chat-user')?.dataset.chatId;
+    const url = new URL(chatContactsUrl, window.location.origin);
+    if (historyView) url.searchParams.set('view', 'history');
+
+    try {
+        const response = await fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!response.ok) throw new Error(`Unable to refresh visitor list (${response.status}).`);
+
+        const html = await response.text();
+        const refreshedList = new DOMParser().parseFromString(html, 'text/html').getElementById('chat-list');
+        if (!refreshedList) throw new Error('The refreshed visitor list was not returned.');
+
+        if (activeId) {
+            refreshedList.querySelector(`.chat-user[data-chat-id="${CSS.escape(activeId)}"]`)
+                ?.closest('.chat-contact-list-item')
+                ?.classList.add('active');
+        }
+
+        currentList.replaceWith(refreshedList);
+        refreshedList.querySelectorAll('.chat-user').forEach(subscribeSidebarChat);
+    } catch (error) {
+        console.error('Unable to refresh visitor list:', error);
+    }
+}
 
 document.addEventListener('DOMContentLoaded', function () {
+
+    pusherChat.subscribe('admin-notifications').bind('visitor-online', data => {
+        const isAuthorized = currentUserRole === 1
+            || authorizedBrandIds.map(Number).includes(Number(data.brand?.id));
+        if (!isAuthorized) return;
+
+        refreshChatContacts();
+    });
 
     // Subscribe currently open chat
     if (chatId) {
@@ -749,39 +741,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Subscribe sidebar chats globally for unread / last message / sound
-    document.querySelectorAll('.chat-user').forEach(el => {
-        const id = el.dataset.chatId;
-        if (!id) return;
-
-        const channel = pusherChat.subscribe(`chat.${id}`);
-
-        channel.bind('new-message', data => {
-            // Only visitor messages trigger unread
-            if (data.role != 3) return;
-
-            // Update unread badge if chat not active
-            if (!isChatActive(id)) {
-                const badge = getUnreadBadge(id);
-                if (badge) {
-                    let count = parseInt(badge.innerText || 0);
-                    badge.innerText = ++count;
-                    badge.style.display = 'inline-block'; // now it works
-                }
-                notifySound.currentTime = 0;
-                notifySound.play().catch(() => {});
-            }else{
-                markMessagesRead(id);
-            }
-
-            notifySound.currentTime = 0;
-            notifySound.play().catch(err => {
-                console.error('Sound play failed:', err);
-            });
-
-            // Update last message in sidebar
-            updateLastMessage(id, data.message);
-        });
-    });
+    document.querySelectorAll('.chat-user').forEach(subscribeSidebarChat);
+    setInterval(refreshChatContacts, 30000);
 });
 
 // ================= Active chat messages =================
@@ -1083,7 +1044,14 @@ function loadMessages(chatId, prepend = false) {
     const oldScrollHeight = container.scrollHeight;
     const oldScrollTop = container.scrollTop;
 
-    fetch(`{{ route('admin.chat.messages', ':id') }}`.replace(':id', encodeURIComponent(requestedChatId)) + `?limit=${limit}&offset=${offset}&prepend=${prepend ? 1 : 0}`)
+    const isPastHistory = document.getElementById('app-chat-history').dataset.readOnlyHistory === 'true';
+    const messageParams = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+        prepend: prepend ? '1' : '0'
+    });
+    if (isPastHistory) messageParams.set('past', '1');
+    fetch(`{{ route('admin.chat.messages', ':id') }}`.replace(':id', encodeURIComponent(requestedChatId)) + `?${messageParams}`)
         .then(res => res.json())
         .then(data => {
             if (String(window.chatId) !== requestedChatId) return;
@@ -1134,12 +1102,13 @@ document.getElementById('load-more-btn')
         loadMessages(window.chatId, true);
     });
 
-document.querySelectorAll('.chat-user').forEach(item => {
-    item.addEventListener('click', function (e) {
-        e.preventDefault();
-        updateSidebar(this.dataset);
-        activateChatTab(this.dataset.chatId, this.dataset.chatStatus, this.dataset);
-    });
+document.addEventListener('click', function (event) {
+    const item = event.target.closest('#chat-list .chat-user');
+    if (!item) return;
+
+    event.preventDefault();
+    updateSidebar(item.dataset);
+    activateChatTab(item.dataset.chatId, item.dataset.chatStatus, item.dataset, item.dataset.isPastChat === 'true');
 });
 
 let isSending = false;
@@ -1279,7 +1248,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (urlChatId) {
         const contact = getChatContact(urlChatId);
-        activateChatTab(urlChatId, contact?.dataset.chatStatus || 'open', contact?.dataset || null);
+        activateChatTab(
+            urlChatId,
+            params.get('past') === '1' ? 'past' : (contact?.dataset.chatStatus || 'open'),
+            contact?.dataset || null,
+            params.get('past') === '1'
+        );
     }
 });
 
@@ -1317,28 +1291,39 @@ function getChatContact(chatId) {
         .find(contact => String(contact.dataset.chatId) === String(chatId));
 }
 
-function activateChatTab(chatId, chatStatus = 'open', contactData = null) {
+function activateChatTab(chatId, chatStatus = 'open', contactData = null, isPastChat = false) {
     const id = String(chatId);
     const contact = contactData || getChatContact(id)?.dataset || {};
     const name = contact.name || openChatTabs.get(id)?.name || 'Visitor';
     const isAlreadyVisible = String(window.chatId) === id
-        && document.getElementById('app-chat-history').dataset.chatId === id;
+        && document.getElementById('app-chat-history').dataset.chatId === id
+        && document.getElementById('app-chat-history').dataset.readOnlyHistory === String(isPastChat);
 
     openChatTabs.set(id, {
         id,
         name,
         status: chatStatus || 'open',
-        contact: { ...contact }
+        contact: { ...contact },
+        isPastChat
     });
-    currentInboxChatId = chatStatus === 'closed' ? null : id;
+    const visitorId = contact.visitorId ? String(contact.visitorId) : null;
+    if (visitorId && currentInboxVisitorId !== visitorId) {
+        currentInboxChatId = null;
+        currentInboxVisitorId = visitorId;
+    }
+    if (!isPastChat) {
+        currentInboxChatId = chatStatus === 'closed' ? null : id;
+    }
     document.getElementById('current-chat-tab').disabled = !currentInboxChatId;
     document.getElementById('chat-session-navigation').classList.add('show');
-    window.dispatchEvent(new CustomEvent('chat-dock-register', {
-        detail: { id, name }
-    }));
-    window.dispatchEvent(new CustomEvent('chat-dock-read', {
-        detail: { chatId: id }
-    }));
+    if (!isPastChat) {
+        window.dispatchEvent(new CustomEvent('chat-dock-register', {
+            detail: { id, name }
+        }));
+        window.dispatchEvent(new CustomEvent('chat-dock-read', {
+            detail: { chatId: id }
+        }));
+    }
     if (contact.name) {
         updateSidebar(contact);
         document.getElementById('profile-visitor-id').value = contact.visitorId || '';
@@ -1360,6 +1345,11 @@ function activateChatTab(chatId, chatStatus = 'open', contactData = null) {
 
     const url = new URL(window.location.href);
     url.searchParams.set('chatId', id);
+    if (isPastChat) {
+        url.searchParams.set('past', '1');
+    } else {
+        url.searchParams.delete('past');
+    }
     window.history.replaceState({}, '', url);
 
     document.querySelectorAll('.chat-user').forEach(item => {
@@ -1367,6 +1357,9 @@ function activateChatTab(chatId, chatStatus = 'open', contactData = null) {
     });
     getChatContact(id)?.closest('.chat-contact-list-item')?.classList.add('active');
     document.getElementById('app-chat-conversation').classList.add('d-none');
+    if (isPastChat) {
+        document.querySelector('.chat-history-footer')?.remove();
+    }
 
     if (isAlreadyVisible) return;
 
@@ -1380,7 +1373,9 @@ function activateChatTab(chatId, chatStatus = 'open', contactData = null) {
     history.classList.add('d-none');
     history.innerHTML = '';
 
-    const getChat = "{{ route('admin.chat.show', ':id') }}".replace(':id', encodeURIComponent(id));
+    let getChat = "{{ route('admin.chat.show', ':id') }}".replace(':id', encodeURIComponent(id));
+    const isReadOnlyHistory = isPastChat || openChatTabs.get(id)?.isPastChat;
+    if (isReadOnlyHistory) getChat += '?past=1';
     fetch(getChat)
         .then(res => {
             if (!res.ok) {
@@ -1393,6 +1388,7 @@ function activateChatTab(chatId, chatStatus = 'open', contactData = null) {
 
             const chatHistoryContainer = document.getElementById('app-chat-history');
             chatHistoryContainer.innerHTML = html;
+            chatHistoryContainer.dataset.readOnlyHistory = String(isReadOnlyHistory);
             chatHistoryContainer.classList.remove('d-none');
 
             const chatBody = chatHistoryContainer.querySelector('.chat-history-body');
@@ -1410,10 +1406,12 @@ function activateChatTab(chatId, chatStatus = 'open', contactData = null) {
             });
 
             loadMessages(id);
-            subscribeToChat(id);
-            markMessagesRead(id);
+            if (!isReadOnlyHistory) {
+                subscribeToChat(id);
+                markMessagesRead(id);
+            }
 
-            if ((openChatTabs.get(id)?.status || chatStatus) === 'closed') {
+            if (isReadOnlyHistory || (openChatTabs.get(id)?.status || chatStatus) === 'closed') {
                 disableChatForm('Chat closed');
             } else {
                 enableChatForm();
@@ -1438,7 +1436,7 @@ function closeChatTab(chatId) {
     if (String(window.chatId) === id) {
         const nextChat = Array.from(openChatTabs.values()).pop();
         if (nextChat) {
-            activateChatTab(nextChat.id, nextChat.status, nextChat.contact);
+            activateChatTab(nextChat.id, nextChat.status, nextChat.contact, nextChat.isPastChat);
             return;
         }
 
@@ -1537,8 +1535,9 @@ function renderPastChats(chats, currentChatId) {
             if (currentChatId) currentInboxChatId = String(currentChatId);
             activateChatTab(
                 pastChat.id,
-                pastChat.status || 'closed',
-                current?.contact || (currentChatId ? getChatContact(currentChatId)?.dataset : null) || null
+                'past',
+                current?.contact || (currentChatId ? getChatContact(currentChatId)?.dataset : null) || null,
+                true
             );
             navList.classList.remove('show');
         });
@@ -1566,6 +1565,7 @@ async function loadVisitorProfile(chatId) {
         const profile = await response.json();
         if (requestId !== profileRequestId || String(window.chatId) !== String(chatId)) return;
 
+        currentInboxVisitorId = String(profile.visitor.id);
         currentInboxChatId = profile.current_chat?.id ? String(profile.current_chat.id) : null;
         document.getElementById('current-chat-tab').disabled = !currentInboxChatId;
         const visitor = profile.visitor;

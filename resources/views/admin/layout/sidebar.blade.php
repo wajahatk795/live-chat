@@ -73,10 +73,17 @@
         </li>
 
         <!-- Chat (including all chat routes) -->
-        <li class="menu-item {{ request()->routeIs('admin.chat', 'admin.chat.*') ? 'active' : '' }}">
+        <li class="menu-item {{ (request()->routeIs('admin.chat') && request()->query('view') !== 'history') || request()->routeIs('admin.chat.*') ? 'active' : '' }}">
             <a href="{{ route('admin.chat') }}" class="menu-link">
                 <i class="menu-icon bx bx-chat"></i>
                 <div>Chat</div>
+            </a>
+        </li>
+
+        <li class="menu-item {{ request()->routeIs('admin.chat') && request()->query('view') === 'history' ? 'active' : '' }}">
+            <a href="{{ route('admin.chat', ['view' => 'history']) }}" class="menu-link">
+                <i class="menu-icon bx bx-history"></i>
+                <div>History</div>
             </a>
         </li>
 

@@ -23,6 +23,13 @@ class MessageController extends Controller
             return response()->json(['error' => 'Chat not found'], 404);
         }
 
+        if ($chat->isPastConversation()) {
+            return response()->json([
+                'error' => true,
+                'message' => 'Past conversations are read-only.',
+            ], 403);
+        }
+
         // 🚫 Block agent from sending while AI is processing a response
         if ($chat->ai_processing) {
             return response()->json([

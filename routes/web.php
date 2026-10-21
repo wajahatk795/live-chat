@@ -67,6 +67,7 @@ Route::middleware(['auth', 'role:1,2', 'lastseen'])->prefix('admin')->group(func
     Route::get('visitor-analytics', [AdminController::class, 'visitorAnalytics'])->name('admin.visitor-analytics');
 
     Route::get('chat', [AdminController::class, 'chat'])->name('admin.chat');
+    Route::get('chat-contacts', [AdminController::class, 'chatContacts'])->name('admin.chat.contacts');
     Route::get('chat/{chatId}', [AdminController::class, 'show'])->name('admin.chat.show');
     Route::get('chat/{chatId}/profile', [AdminController::class, 'chatProfile'])->name('admin.chat.profile');
     Route::patch('chat/{chatId}/profile', [AdminController::class, 'updateChatProfile'])->name('admin.chat.profile.update');

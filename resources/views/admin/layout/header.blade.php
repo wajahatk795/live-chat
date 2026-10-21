@@ -102,6 +102,29 @@
                                             </div>
                                         </div>
                                     </li>
+                                @elseif($notification->type === 'App\Notifications\NewVisitorNotification')
+                                    <li class="list-group-item dropdown-notifications-item">
+                                        <div class="d-flex">
+                                            <div class="flex-shrink-0 me-3">
+                                                <div class="avatar avatar-sm">
+                                                    @if(preg_match('/^[A-Za-z]{2}$/', (string) ($notification->data['country_code'] ?? '')))
+                                                        <img src="https://flagcdn.com/w40/{{ strtolower($notification->data['country_code']) }}.png"
+                                                            alt="Visitor country flag" class="rounded-circle">
+                                                    @else
+                                                        <span class="avatar-initial rounded-circle bg-label-info"><i class="bx bx-user-check"></i></span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <h6 class="small mb-1 fw-semibold">{{ $notification->data['title'] ?? 'New Visitor' }}</h6>
+                                                <small class="d-block text-body mb-1">{{ $notification->data['message'] ?? '' }}</small>
+                                                <small class="text-muted"><i class="bx bx-time-five me-1"></i>{{ $notification->created_at->diffForHumans() }}</small>
+                                            </div>
+                                            <div class="flex-shrink-0 dropdown-notifications-actions">
+                                                <span class="badge badge-dot bg-primary"></span>
+                                            </div>
+                                        </div>
+                                    </li>
                                 @else
                                     <li class="list-group-item dropdown-notifications-item">
                                         <div class="d-flex">

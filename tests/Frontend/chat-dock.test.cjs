@@ -90,11 +90,12 @@ test('both visitor widgets use the copied script URL as their API base URL', () 
 
 test('visitor profile avatars use country flags when a country code exists', () => {
     const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const contactsView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat', '_contacts.blade.php'), 'utf8');
     const messagesView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat', 'messages.blade.php'), 'utf8');
     const layoutView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'layout', 'app.blade.php'), 'utf8');
 
-    assert.match(chatView, /data-country-code="{{ \$chat->main_visitor->country_code/);
-    assert.match(chatView, /https:\/\/flagcdn\.com\/w40\/\{\{ strtolower\(\$chat->main_visitor->country_code\) \}\}\.png/);
+    assert.match(contactsView, /data-country-code="{{ \$chat->main_visitor->country_code/);
+    assert.match(contactsView, /https:\/\/flagcdn\.com\/w40\/\{\{ strtolower\(\$chat->main_visitor->country_code\) \}\}\.png/);
     assert.match(chatView, /id="sidebar-avatar-flag"/);
     assert.match(chatView, /flag\.src = `https:\/\/flagcdn\.com\/w40\/\$\{countryCode\}\.png`/);
     assert.match(chatView, /function renderMessage\([\s\S]*?countryCode = null\)/);
@@ -102,6 +103,46 @@ test('visitor profile avatars use country flags when a country code exists', () 
     assert.match(chatView, /msg\.user\?\.country_code/);
     assert.match(messagesView, /https:\/\/flagcdn\.com\/w40\/\{\{ strtolower\(\$chat->main_visitor->country_code\) \}\}\.png/);
     assert.match(layoutView, /message\.user\?\.country_code/);
+});
+
+test('chat inbox has separate online and offline history views with recurring visitor heartbeats', () => {
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const contactsView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat', '_contacts.blade.php'), 'utf8');
+    const sidebarView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'layout', 'sidebar.blade.php'), 'utf8');
+    const controller = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'Http', 'Controllers', 'AdminController.php'), 'utf8');
+    const widget = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'widget', 'widget.js'), 'utf8');
+    const liveWidget = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'widget', 'live-widget.js'), 'utf8');
+
+    assert.match(controller, /historyView = request\(\)->query\('view'\) === 'history'/);
+    assert.match(controller, /now\(\)->subMinutes\(3\)/);
+    assert.match(contactsView, /No offline visitors found/);
+    assert.match(chatView, /setInterval\(refreshChatContacts, 30000\)/);
+    assert.match(sidebarView, /route\('admin\.chat', \['view' => 'history'\]\)/);
+    assert.match(widget, /setInterval\(sendHeartbeat, 30000\)/);
+    assert.match(liveWidget, /setInterval\(sendHeartbeat, 30000\)/);
+});
+
+test('live visitor presence events refresh the chat list without a page reload', () => {
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const visitorController = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'Http', 'Controllers', 'Api', 'VisitorController.php'), 'utf8');
+
+    assert.match(visitorController, /'visitor-online'/);
+    assert.match(chatView, /bind\('visitor-online'/);
+    assert.match(chatView, /refreshChatContacts\(\)/);
+});
+
+test('visitor notifications render country flags when the visitor country code is available', () => {
+    const headerView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'layout', 'header.blade.php'), 'utf8');
+    const appView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'layout', 'app.blade.php'), 'utf8');
+    const visitorController = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'Http', 'Controllers', 'Api', 'VisitorController.php'), 'utf8');
+    const notification = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'Notifications', 'NewVisitorNotification.php'), 'utf8');
+
+    assert.match(headerView, /notification->data\['country_code'\]/);
+    assert.match(headerView, /flagcdn\.com\/w40\/\{\{ strtolower\(\$notification->data\['country_code'\]\) \}\}\.png/);
+    assert.match(appView, /visitorCountryCode/);
+    assert.match(appView, /flagcdn\.com\/w40\/\$\{visitorCountryCode\}\.png/);
+    assert.match(visitorController, /'country_code' => \$visitor->country_code/);
+    assert.match(notification, /'country_code' => \$this->visitor->country_code/);
 });
 
 test('agent chat composer only shows saved shortcuts for slash suggestions', () => {
@@ -224,8 +265,57 @@ test('past-chat navigation does not create a current chat when none exists', () 
     );
     elements.get('past-chat-list').children[0].handlers.click();
 
-    assert.deepEqual(selectedChat, [9, 'closed', null]);
+    assert.deepEqual(selectedChat, [9, 'past', null, true]);
     assert.equal(context.currentInboxChatId, null);
+});
+
+test('selecting a past chat opens its read-only full-history view', () => {
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const messagesView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat', 'messages.blade.php'), 'utf8');
+
+    assert.match(chatView, /if \(isReadOnlyHistory\) getChat \+= '\?past=1'/);
+    assert.match(chatView, /if \(!isReadOnlyHistory\) \{\s*subscribeToChat\(id\);\s*markMessagesRead\(id\);/);
+    assert.match(chatView, /if \(isPastHistory\) messageParams\.set\('past', '1'\)/);
+    assert.match(chatView, /dataset\.readOnlyHistory === 'true'/);
+    assert.match(chatView, /if \(!isPastChat\) \{\s*currentInboxChatId = chatStatus === 'closed' \? null : id;/);
+    assert.match(chatView, /if \(isPastChat\) \{\s*document\.querySelector\('\.chat-history-footer'\)\?\.remove\(\);/);
+    assert.match(chatView, /currentInboxChatId = profile\.current_chat\?\.id \? String\(profile\.current_chat\.id\) : null;/);
+    assert.match(chatView, /if \(!currentInboxChatId\) return;[\s\S]*?activateChatTab\(currentInboxChatId,/);
+    assert.match(chatView, /item\.dataset\.isPastChat === 'true'/);
+    assert.match(messagesView, /&& !\$readOnly/);
+    assert.match(messagesView, /id="load-more-btn"/);
+    const contactsView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat', '_contacts.blade.php'), 'utf8');
+    assert.match(contactsView, /data-is-past-chat="{{ \$isPastChat \? 'true' : 'false' }}"/);
+    assert.match(contactsView, /\$isPastChat \? '\?past=1' : ''/);
+    assert.match(contactsView, /\$chat->isPastConversation\(now\(\)->subWeek\(\)\)/);
+});
+
+test('past chat count is based on all one-week-old conversations and flags flow into visitor message avatars', () => {
+    const controller = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'Http', 'Controllers', 'AdminController.php'), 'utf8');
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const appView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'layout', 'app.blade.php'), 'utf8');
+
+    assert.match(controller, /'past_chats' => \$pastChats/);
+    assert.match(chatView, /document\.getElementById\('past-chat-count'\)\.textContent = String\(pastChats\.length\)/);
+    assert.match(chatView, /const avatar = role == 3 && \/\^\[a-z\]\{2\}\$\/\.test\(countryCode\)/);
+    assert.match(appView, /avatar\.src = `https:\/\/flagcdn\.com\/w40\/\$\{visitorCountryCode\}\.png`/);
+    assert.match(appView, /showChatToast\([\s\S]*?getVisitorCountryCode\(data\)/);
+});
+
+test('visitor notification flag lookup accepts country codes from supported event payloads', () => {
+    const appView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'layout', 'app.blade.php'), 'utf8');
+    const start = appView.indexOf('function getVisitorCountryCode(data) {');
+    const end = appView.indexOf('\n            function showChatToast', start);
+    assert.notEqual(start, -1, 'visitor country-code resolver must exist');
+    assert.notEqual(end, -1, 'visitor country-code resolver must end before toast renderer');
+
+    const context = {};
+    vm.runInNewContext(`${appView.slice(start, end)}\nthis.resolveCountryCode = getVisitorCountryCode;`, context);
+
+    assert.equal(context.resolveCountryCode({ visitor: { country_code: 'US' } }), 'us');
+    assert.equal(context.resolveCountryCode({ country_code: 'GB' }), 'gb');
+    assert.equal(context.resolveCountryCode({ message: { user: { country_code: 'CA' } } }), 'ca');
+    assert.equal(context.resolveCountryCode({ visitor: { country_code: 'unknown' } }), null);
 });
 
 test('visitor profile stays visible on small screens and follows selected chats', () => {

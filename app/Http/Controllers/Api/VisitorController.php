@@ -177,6 +177,7 @@ class VisitorController extends Controller
                 ],
                 'visitor' => [
                     'id' => $visitor->id,
+                    'country_code' => $visitor->country_code,
                 ],
                 'message' => [
                     'id' => $msg->id,
@@ -381,6 +382,8 @@ class VisitorController extends Controller
         $chat = $this->getOrCreateCurrentChat($visitor);
         $chat->update(['last_visitor_activity_at' => now()]);
 
+        $this->broadcastVisitorOnline($visitor, $chat, $brand, $userIds);
+
         $settings = $brand->chatSetting;
 
         $agentOnline = User::whereIn('id', $userIds)
@@ -410,6 +413,7 @@ class VisitorController extends Controller
                     'visitor' => [
                         'id' => $visitor->id,
                         'session_id' => $visitor->session_id,
+                        'country_code' => $visitor->country_code,
                     ],
                     'chat' => [
                         'id' => $chat->id,
@@ -516,6 +520,29 @@ class VisitorController extends Controller
         }
 
         return $chat;
+    }
+
+    private function broadcastVisitorOnline(Visitor $visitor, Chat $chat, Brand $brand, array $userIds): void
+    {
+        emit_pusher_notification(
+            'admin-notifications',
+            'visitor-online',
+            [
+                'brand' => [
+                    'id' => $brand->id,
+                    'domain' => $brand->domain,
+                ],
+                'visitor' => [
+                    'id' => $visitor->id,
+                    'session_id' => $visitor->session_id,
+                ],
+                'chat' => [
+                    'id' => $chat->id,
+                    'status' => $chat->status,
+                ],
+                'user_ids' => $userIds,
+            ]
+        );
     }
 
     public function typing(Request $request)
@@ -649,6 +676,8 @@ class VisitorController extends Controller
         if (!$visitor)
             return response()->json();
 
+        $wasOffline = !$visitor->last_seen_at
+            || $visitor->last_seen_at->lt(now()->subMinutes(3));
         $visitor->last_seen_at = now();
         $visitor->save();
 
@@ -659,6 +688,13 @@ class VisitorController extends Controller
         if ($chat) {
             $chat->last_visitor_activity_at = now();
             $chat->save();
+
+            if ($wasOffline) {
+                $brand = Brand::find($chat->brand_id);
+                if ($brand) {
+                    $this->broadcastVisitorOnline($visitor, $chat, $brand, $brand->users->pluck('id')->all());
+                }
+            }
         }
 
         return response()->json(['status' => true]);

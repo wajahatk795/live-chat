@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 class Chat extends Model
 {
@@ -57,5 +58,24 @@ class Chat extends Model
     public function main_visitor()
     {
         return $this->hasOne(Visitor::class, 'id', 'visitor_id');
+    }
+
+    public function isPastConversation(?Carbon $cutoff = null): bool
+    {
+        $cutoff ??= now()->subWeek();
+        $lastMessageAt = $this->getAttribute('messages_max_created_at')
+            ?? $this->messages()->max('created_at');
+        $activityTimestamps = collect([
+            $this->last_visitor_activity_at,
+            $this->last_agent_activity_at,
+            $lastMessageAt,
+        ])->filter()->map(fn ($timestamp) => Carbon::parse($timestamp));
+
+        if ($activityTimestamps->isEmpty()) {
+            $lastActivity = $this->closed_at ?? $this->updated_at;
+            return !$lastActivity || $lastActivity->lte($cutoff);
+        }
+
+        return $activityTimestamps->max()->lte($cutoff);
     }
 }

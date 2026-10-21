@@ -1007,10 +1007,6 @@
             // 🚫 Don't send if brand invalid
             if (!isBrandValid) return;
 
-            if(!window.AGENT_ONLINE) return;
-
-            if(!window.ASSING_USER_IDS.length > 0) return;
-
             fetch(`${BASE_URL}/api/visitor-heartbeat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1019,6 +1015,9 @@
                 }),
             }).catch(() => {});
         }
+
+        sendHeartbeat();
+        setInterval(sendHeartbeat, 30000);
 
         ["click", "keydown", "mousemove", "scroll"].forEach((evt) => {
             window.addEventListener(evt, throttle(sendHeartbeat, 60000));

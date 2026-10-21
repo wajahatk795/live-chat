@@ -33,6 +33,7 @@ class NewVisitorNotification extends Notification
             'brand_id' => $this->brand->id,
             'visitor_id' => $this->visitor->id,
             'session_id' => $this->visitor->session_id,
+            'country_code' => $this->visitor->country_code,
         ];
     }
 }

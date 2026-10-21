@@ -79,34 +79,51 @@ class AdminController extends Controller
 
     public function chat($chatId = null)
     {
-        $userBrandIds = auth()->user()->auth_brands->pluck('id')->toArray();
-        $user = User::with(['get_chat' => function($query) use ($userBrandIds) {
-                $query->whereHas('visitor', function($q) use ($userBrandIds) {
-                    $q->whereIn('brand_id', $userBrandIds);
-                });
-            }])
-            ->where('role', 3)
-            ->get();
-
-        if(auth()->user()->role == 1) {
-            $chats = Chat::with(['visitor', 'messages', 'main_visitor'])
-                ->where('status', 'open')
-                ->latest()
-                ->get();
-        }else{
-            $chats = Chat::with(['visitor', 'main_visitor'])
-                ->where('status', 'open')
-                ->whereHas('visitor', function($query) use ($userBrandIds) {
-                    $query->whereIn('brand_id', $userBrandIds);
-                })
-                ->latest()
-                ->get();
-        }
+        $historyView = request()->query('view') === 'history';
+        $chats = $this->chatListQuery($historyView)->get();
 
         $messages = collect();
         $chatId = null;
 
-        return view('admin.chat', compact('user', 'messages', 'chatId', 'chats'));
+        return view('admin.chat', compact('messages', 'chatId', 'chats', 'historyView'));
+    }
+
+    public function chatContacts(Request $request)
+    {
+        $historyView = $request->query('view') === 'history';
+
+        return view('admin.chat._contacts', [
+            'chats' => $this->chatListQuery($historyView)->get(),
+            'historyView' => $historyView,
+        ]);
+    }
+
+    private function chatListQuery(bool $historyView)
+    {
+        $onlineSince = now()->subMinutes(3);
+        $userBrandIds = auth()->user()->auth_brands->pluck('id')->toArray();
+
+        $query = Chat::with(['visitor', 'main_visitor'])
+            ->withMax('messages', 'created_at')
+            ->when(auth()->user()->role != 1, function ($query) use ($userBrandIds) {
+                $query->whereHas('visitor', function ($visitorQuery) use ($userBrandIds) {
+                    $visitorQuery->whereIn('brand_id', $userBrandIds);
+                });
+            })
+            ->whereHas('main_visitor', function ($query) use ($historyView, $onlineSince) {
+                if ($historyView) {
+                    $query->whereNull('last_seen_at')
+                        ->orWhere('last_seen_at', '<', $onlineSince);
+                } else {
+                    $query->where('last_seen_at', '>=', $onlineSince);
+                }
+            });
+
+        if (!$historyView) {
+            $query->where('status', 'open');
+        }
+
+        return $query->latest();
     }
     public function notification()
     {
@@ -180,11 +197,12 @@ class AdminController extends Controller
 
     public function show($chatId)
     {
-        $chat = Chat::with('visitor')->findOrFail($chatId);
+        $chat = Chat::with(['visitor', 'main_visitor'])->findOrFail($chatId);
+        $readOnly = request()->boolean('past');
         $visitorId = Chat::where('id', $chatId)->value('visitor_id');
         $user = User::with('get_chat')->where('visitor_id', $visitorId)->first();
 
-        return view('admin.chat.messages', compact('chatId', 'user', 'chat'));
+        return view('admin.chat.messages', compact('chatId', 'user', 'chat', 'readOnly'));
     }
 
     public function chatProfile($chatId)
@@ -195,25 +213,50 @@ class AdminController extends Controller
         $visitor = $chat->main_visitor;
         abort_unless($visitor, 404);
         $user = User::where('visitor_id', $chat->visitor_id)->firstOrFail();
+        $pastChatsBefore = now()->subWeek();
         $currentChat = Chat::where('visitor_id', $chat->visitor_id)
             ->where('brand_id', $chat->brand_id)
             ->where('status', 'open')
-            ->latest('updated_at')
-            ->first(['id', 'status']);
+            ->where(function ($query) use ($pastChatsBefore) {
+                $this->whereRecentChatActivity($query, $pastChatsBefore);
+            })
+            ->withMax('messages', 'created_at')
+            ->get()
+            ->sortByDesc(fn (Chat $currentChat) => $this->chatActivityAt($currentChat))
+            ->first();
 
-        $pastChats = Chat::where('visitor_id', $chat->visitor_id)
+        $pastChatQuery = Chat::where('visitor_id', $chat->visitor_id)
             ->where('brand_id', $chat->brand_id)
-            ->where('status', 'closed')
-            ->orderByRaw('COALESCE(last_visitor_activity_at, closed_at, updated_at) DESC')
-            ->get(['id', 'status', 'created_at', 'updated_at', 'last_visitor_activity_at', 'closed_at'])
+            ->where(function ($query) use ($pastChatsBefore) {
+                $query->whereHas('messages', fn ($messages) => $messages->where('created_at', '<=', $pastChatsBefore))
+                    ->orWhere(function ($noMessages) use ($pastChatsBefore) {
+                        $noMessages->whereDoesntHave('messages')
+                            ->where(function ($activity) use ($pastChatsBefore) {
+                                $this->wherePastChatActivity($activity, $pastChatsBefore);
+                            });
+                    });
+            });
+        $pastChats = $pastChatQuery
+            ->withMax([
+                'messages as past_messages_max_created_at' => fn ($messages) => $messages->where('created_at', '<=', $pastChatsBefore),
+            ], 'created_at')
+            ->get()
             ->map(function ($pastChat) {
                 return [
                     'id' => $pastChat->id,
-                    'status' => $pastChat->status,
-                    'date' => optional($pastChat->last_visitor_activity_at ?? $pastChat->closed_at ?? $pastChat->updated_at)->toIso8601String(),
-                    'preview' => $pastChat->messages()->whereNotNull('sender')->latest()->value('message') ?? 'No messages',
+                    'status' => $pastChat->status === 'open' ? 'closed' : $pastChat->status,
+                    'date' => optional($pastChat->past_messages_max_created_at
+                        ? Carbon::parse($pastChat->past_messages_max_created_at)
+                        : $this->chatActivityAt($pastChat))->toIso8601String(),
+                    'preview' => $pastChat->messages()
+                        ->whereNotNull('sender')
+                        ->where('created_at', '<=', now()->subWeek())
+                        ->latest()
+                        ->value('message') ?? 'No messages',
                 ];
-            });
+            })
+            ->sortByDesc('date')
+            ->values();
 
         $lastActivity = $visitor->last_seen_at
             ?? $chat->last_visitor_activity_at
@@ -306,17 +349,69 @@ class AdminController extends Controller
         );
     }
 
+    private function whereRecentChatActivity($query, Carbon $cutoff): void
+    {
+        $query->where('last_visitor_activity_at', '>', $cutoff)
+            ->orWhere('last_agent_activity_at', '>', $cutoff)
+            ->orWhereHas('messages', fn ($messages) => $messages->where('created_at', '>', $cutoff))
+            ->orWhere(function ($fallback) use ($cutoff) {
+                $fallback->whereNull('last_visitor_activity_at')
+                    ->whereNull('last_agent_activity_at')
+                    ->whereDoesntHave('messages')
+                    ->whereRaw('COALESCE(closed_at, updated_at) > ?', [$cutoff]);
+            });
+    }
+
+    private function wherePastChatActivity($query, Carbon $cutoff): void
+    {
+        $query->where(function ($activity) use ($cutoff) {
+            $activity->whereNull('last_visitor_activity_at')
+                ->orWhere('last_visitor_activity_at', '<=', $cutoff);
+        })->where(function ($activity) use ($cutoff) {
+            $activity->whereNull('last_agent_activity_at')
+                ->orWhere('last_agent_activity_at', '<=', $cutoff);
+        })->whereDoesntHave('messages', fn ($messages) => $messages->where('created_at', '>', $cutoff))
+            ->where(function ($fallback) use ($cutoff) {
+                $fallback->whereNotNull('last_visitor_activity_at')
+                    ->orWhereNotNull('last_agent_activity_at')
+                    ->orWhereHas('messages')
+                    ->orWhereRaw('COALESCE(closed_at, updated_at) <= ?', [$cutoff]);
+            });
+    }
+
+    private function chatActivityAt(Chat $chat): ?Carbon
+    {
+        $timestamps = collect([
+            $chat->last_visitor_activity_at,
+            $chat->last_agent_activity_at,
+            $chat->messages_max_created_at ?? null,
+        ])->filter()->map(fn ($timestamp) => Carbon::parse($timestamp));
+
+        return $timestamps->isNotEmpty()
+            ? $timestamps->max()
+            : ($chat->closed_at ?? $chat->updated_at);
+    }
+
     public function messages(Request $request, $chatId)
     {
-        $limit = $request->get('limit', 20);
-        $offset = $request->get('offset', 0);
-        $prepend = $request->get('prepend', 0); // 1 if load more
+        $limit = max(1, min(100, (int) $request->get('limit', 20)));
+        $offset = max(0, (int) $request->get('offset', 0));
+        $prepend = $request->boolean('prepend');
+        $cutoff = now()->subWeek();
 
         $chat = Chat::with(['visitor', 'main_visitor'])->find($chatId);
 
-        // Fetch messages
-        $messages = Message::with('user')
-            ->where('chat_id', $chatId)
+        $messageQuery = Message::with('user')
+            ->where('chat_id', $chatId);
+
+        if ($request->boolean('past')) {
+            $messageQuery->where('created_at', '<=', $cutoff);
+        } else {
+            $messageQuery->where('created_at', '>', $cutoff);
+        }
+
+        $total = (clone $messageQuery)->count();
+        $messages = $messageQuery
             ->orderBy('id', 'desc')  // newest first
             ->skip($offset)
             ->take($limit)
@@ -334,8 +429,6 @@ class AdminController extends Controller
             $messages = $messages->reverse()->values();
         }
         // If prepend=true, keep desc → top shows newest first in that batch
-
-        $total = Message::where('chat_id', $chatId)->count();
 
         return response()->json([
             'data' => $messages,

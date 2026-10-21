@@ -710,16 +710,45 @@
                 });
             }
 
-            function showChatToast(chatId, title, message) {
+            function getVisitorCountryCode(data) {
+                const countryCode = String(
+                    data?.visitor?.country_code
+                    || data?.country_code
+                    || data?.message?.user?.country_code
+                    || ''
+                ).trim().toLowerCase();
+
+                return /^[a-z]{2}$/.test(countryCode) ? countryCode : null;
+            }
+
+            function showChatToast(chatId, title, message, countryCode = null) {
                 toastChatId = String(chatId);
                 dockToast.replaceChildren();
 
+                const visitorCountryCode = String(countryCode || '').toLowerCase();
+                const content = document.createElement('div');
+                content.className = 'd-flex align-items-center gap-2';
+
+                if (/^[a-z]{2}$/.test(visitorCountryCode)) {
+                    const avatar = document.createElement('img');
+                    avatar.src = `https://flagcdn.com/w40/${visitorCountryCode}.png`;
+                    avatar.alt = 'Visitor country flag';
+                    avatar.className = 'rounded-circle flex-shrink-0';
+                    avatar.style.width = '32px';
+                    avatar.style.height = '32px';
+                    avatar.style.objectFit = 'cover';
+                    content.appendChild(avatar);
+                }
+
+                const text = document.createElement('div');
                 const heading = document.createElement('strong');
                 heading.className = 'd-block mb-1';
                 heading.textContent = title;
                 const preview = document.createElement('span');
                 preview.textContent = message;
-                dockToast.append(heading, preview);
+                text.append(heading, preview);
+                content.appendChild(text);
+                dockToast.appendChild(content);
                 dockToast.classList.add('show');
 
                 clearTimeout(toastTimeout);
@@ -1049,7 +1078,12 @@
                     return;
                 }
 
-                showChatToast(key, dockChats.get(key)?.name || 'New visitor message', preview);
+                showChatToast(
+                    key,
+                    dockChats.get(key)?.name || 'New visitor message',
+                    preview,
+                    getVisitorCountryCode(data)
+                );
             }
 
             try {
@@ -1122,16 +1156,25 @@
                 }, isChatPage);
 
                 if (!isChatPage) {
-                    showChatToast(chatId, 'New visitor', `${data.brand.domain} just connected.`);
+                    showChatToast(
+                        chatId,
+                        'New visitor',
+                        `${data.brand.domain} just connected.`,
+                        getVisitorCountryCode(data)
+                    );
                 }
 
                 // Append to dropdown notification
+                const visitorCountryCode = getVisitorCountryCode(data);
+                const visitorAvatar = /^[a-z]{2}$/.test(visitorCountryCode)
+                    ? `<img src="https://flagcdn.com/w40/${visitorCountryCode}.png" alt="Visitor country flag" class="rounded-circle">`
+                    : '<span class="avatar-initial rounded-circle bg-label-info"><i class="bx bx-user-check"></i></span>';
                 const html = `
                     <li class="list-group-item dropdown-notifications-item">
                         <div class="d-flex">
                             <div class="flex-shrink-0 me-3">
                                 <div class="avatar avatar-sm">
-                                    <span class="avatar-initial rounded-circle bg-label-info"><i class="bx bx-user-check"></i></span>
+                                    ${visitorAvatar}
                                 </div>
                             </div>
                             <div class="flex-grow-1">
