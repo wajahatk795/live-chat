@@ -220,8 +220,8 @@ test('typing slash command replaces it with the selected shortcut reply', () => 
 test('past-chat navigation does not create a current chat when none exists', () => {
     const chatViewPath = path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php');
     const chatView = fs.readFileSync(chatViewPath, 'utf8');
-    const start = chatView.indexOf('function renderPastChats(chats, currentChatId) {');
-    const end = chatView.indexOf('\nasync function loadVisitorProfile', start);
+    const start = chatView.indexOf('function renderPastChats(chats, currentChatId, pastMessageCount) {');
+    const end = chatView.indexOf('\nfunction updateCurrentInboxChat', start);
     assert.notEqual(start, -1, 'past chat renderer must exist');
     assert.notEqual(end, -1, 'past chat renderer must precede profile loading');
 
@@ -237,10 +237,12 @@ test('past-chat navigation does not create a current chat when none exists', () 
         },
         addEventListener(eventName, handler) {
             this.handlers = { ...this.handlers, [eventName]: handler };
+        },
+        setAttribute(name, value) {
+            this.attributes = { ...this.attributes, [name]: value };
         }
     });
     const elements = new Map([
-        ['profile-past-chats', createElement()],
         ['past-chat-list', createElement()],
         ['profile-past-chat-count', createElement()],
         ['past-chat-count', createElement()]
@@ -260,13 +262,101 @@ test('past-chat navigation does not create a current chat when none exists', () 
     };
 
     vm.runInNewContext(
-        `${chatView.slice(start, end)}renderPastChats([{ id: 9, status: 'closed', preview: 'Earlier chat' }], null);`,
+        `${chatView.slice(start, end)}renderPastChats([{ id: 9, status: 'closed', date: '2026-02-17T04:45:08Z', preview: 'Earlier chat' }, { id: 10, status: 'closed', date: '2026-02-16T04:45:08Z', preview: 'Another old chat' }], null, 5);`,
         context
     );
-    elements.get('past-chat-list').children[0].handlers.click();
+    const pastList = elements.get('past-chat-list');
+    pastList.children[0].handlers.click();
 
     assert.deepEqual(selectedChat, [9, 'past', null, true]);
     assert.equal(context.currentInboxChatId, null);
+    assert.equal(pastList.children[0].textContent, 'Earlier chat');
+    assert.doesNotMatch(pastList.children[0].textContent, /2026|2\/17/);
+    assert.equal(pastList.children.length, 2);
+    assert.equal(elements.get('past-chat-count').textContent, '2');
+    assert.equal(elements.get('profile-past-chat-count').textContent, '5');
+});
+
+test('past-chat tab opens the newest past conversation directly', () => {
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const start = chatView.indexOf('function openLatestPastChat() {');
+    const end = chatView.indexOf('\nfunction getChatContact', start);
+    assert.notEqual(start, -1, 'past-chat tab must open a past conversation directly');
+    assert.notEqual(end, -1, 'direct past-chat opener must precede chat contact lookup');
+
+    let openedChat = null;
+    let popupToggled = false;
+    const firstPastChat = { click() { openedChat = 9; } };
+    const context = {
+        document: {
+            getElementById(id) {
+                assert.equal(id, 'past-chat-list');
+                return {
+                    querySelector(selector) {
+                        assert.equal(selector, 'button');
+                        return firstPastChat;
+                    },
+                    classList: { toggle() { popupToggled = true; } }
+                };
+            }
+        }
+    };
+
+    vm.runInNewContext(`${chatView.slice(start, end)}openLatestPastChat();`, context);
+
+    assert.equal(openedChat, 9);
+    assert.equal(popupToggled, false);
+});
+
+test('loading a past profile preserves the same visitor current chat and clears it for another visitor', () => {
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const start = chatView.indexOf('function updateCurrentInboxChat(profile) {');
+    const end = chatView.indexOf('\nasync function loadVisitorProfile', start);
+    assert.notEqual(start, -1, 'current chat profile updater must exist');
+
+    const currentTab = { disabled: false };
+    const context = {
+        currentInboxVisitorId: 'visitor-1',
+        currentInboxChatId: 'chat-2',
+        document: { getElementById: () => currentTab }
+    };
+    vm.runInNewContext(
+        `${chatView.slice(start, end)}updateCurrentInboxChat({ visitor: { id: 'visitor-1' }, current_chat: null });`,
+        context
+    );
+    assert.equal(context.currentInboxChatId, 'chat-2');
+    assert.equal(currentTab.disabled, false);
+
+    vm.runInNewContext(
+        `updateCurrentInboxChat({ visitor: { id: 'visitor-2' }, current_chat: null });`,
+        context
+    );
+    assert.equal(context.currentInboxChatId, null);
+    assert.equal(currentTab.disabled, true);
+
+    vm.runInNewContext(
+        `updateCurrentInboxChat({ visitor: { id: 'visitor-2' }, current_chat: { id: 'chat-9' } });`,
+        context
+    );
+    assert.equal(context.currentInboxChatId, 'chat-9');
+    assert.equal(currentTab.disabled, false);
+});
+
+test('past message total is displayed in the visitor activity card', () => {
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const profileStart = chatView.indexOf('function renderPastChats(chats, currentChatId, pastMessageCount) {');
+    const profileEnd = chatView.indexOf('\nfunction updateCurrentInboxChat', profileStart);
+    const updaterStart = profileEnd + '\n'.length;
+    const updaterEnd = chatView.indexOf('\nasync function loadVisitorProfile', updaterStart);
+    assert.notEqual(profileStart, -1);
+    assert.notEqual(updaterStart, -1);
+
+    assert.match(chatView, /<h6[^>]*>Past chats<\/h6>\s*<div class="chat-profile-stat">\s*<strong id="profile-past-chat-count">0<\/strong><span>Past messages<\/span>/);
+    assert.match(chatView, /Past chats <span class="badge bg-label-secondary ms-1" id="past-chat-count">0<\/span>/);
+    assert.match(chatView, /renderPastChats\(profile\.past_chats, currentInboxChatId, profile\.past_message_count\)/);
+    assert.match(chatView, /profile-past-chat-count'\)\.textContent = String\(Math\.max\(0, Number\(pastMessageCount\) \|\| 0\)\)/);
+    assert.doesNotMatch(chatView, /id="profile-past-chats"/);
+    assert.match(chatView, /document\.getElementById\('past-chat-toggle'\)\.addEventListener\('click', \(\) => \{\s*openLatestPastChat\(\);/);
 });
 
 test('selecting a past chat opens its read-only full-history view', () => {
@@ -279,7 +369,7 @@ test('selecting a past chat opens its read-only full-history view', () => {
     assert.match(chatView, /dataset\.readOnlyHistory === 'true'/);
     assert.match(chatView, /if \(!isPastChat\) \{\s*currentInboxChatId = chatStatus === 'closed' \? null : id;/);
     assert.match(chatView, /if \(isPastChat\) \{\s*document\.querySelector\('\.chat-history-footer'\)\?\.remove\(\);/);
-    assert.match(chatView, /currentInboxChatId = profile\.current_chat\?\.id \? String\(profile\.current_chat\.id\) : null;/);
+    assert.match(chatView, /updateCurrentInboxChat\(profile\)/);
     assert.match(chatView, /if \(!currentInboxChatId\) return;[\s\S]*?activateChatTab\(currentInboxChatId,/);
     assert.match(chatView, /item\.dataset\.isPastChat === 'true'/);
     assert.match(messagesView, /&& !\$readOnly/);

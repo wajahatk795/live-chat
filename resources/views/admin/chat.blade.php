@@ -480,9 +480,6 @@
                         <section class="chat-profile-section" aria-label="Visitor activity">
                             <div class="d-flex gap-2">
                                 <div class="chat-profile-stat flex-fill">
-                                    <strong id="profile-past-chat-count">0</strong><span>Past chats</span>
-                                </div>
-                                <div class="chat-profile-stat flex-fill">
                                     <strong id="profile-session-duration">-</strong><span>Time on site</span>
                                 </div>
                             </div>
@@ -495,7 +492,9 @@
 
                         <section class="chat-profile-section">
                             <h6 class="small text-uppercase text-body-secondary mb-2">Past chats</h6>
-                            <div class="small text-body-secondary" id="profile-past-chats">No past chats</div>
+                            <div class="chat-profile-stat">
+                                <strong id="profile-past-chat-count">0</strong><span>Past messages</span>
+                            </div>
                         </section>
 
                         <section class="chat-profile-section">
@@ -1276,15 +1275,12 @@ document.getElementById('current-chat-tab').addEventListener('click', () => {
 });
 
 document.getElementById('past-chat-toggle').addEventListener('click', () => {
-    document.getElementById('past-chat-list').classList.toggle('show');
+    openLatestPastChat();
 });
 
-document.addEventListener('click', event => {
-    const navigation = document.getElementById('chat-session-navigation');
-    if (navigation && !navigation.contains(event.target)) {
-        document.getElementById('past-chat-list').classList.remove('show');
-    }
-});
+function openLatestPastChat() {
+    document.getElementById('past-chat-list').querySelector('button')?.click();
+}
 
 function getChatContact(chatId) {
     return Array.from(document.querySelectorAll('.chat-user'))
@@ -1329,7 +1325,6 @@ function activateChatTab(chatId, chatStatus = 'open', contactData = null, isPast
         document.getElementById('profile-visitor-id').value = contact.visitorId || '';
         document.getElementById('profile-notes').value = '';
         document.getElementById('profile-save-status').textContent = '';
-        document.getElementById('profile-past-chats').textContent = 'Loading visitor details...';
         document.getElementById('profile-past-chat-count').textContent = '0';
         document.getElementById('past-chat-count').textContent = '0';
         document.getElementById('past-chat-list').replaceChildren();
@@ -1504,17 +1499,14 @@ function formatSessionDuration(seconds) {
     return minutes ? `${hours} hr ${minutes} min` : `${hours} hr`;
 }
 
-function renderPastChats(chats, currentChatId) {
-    const list = document.getElementById('profile-past-chats');
+function renderPastChats(chats, currentChatId, pastMessageCount) {
     const navList = document.getElementById('past-chat-list');
-    list.replaceChildren();
     navList.replaceChildren();
     const pastChats = Array.isArray(chats) ? chats : [];
-    document.getElementById('profile-past-chat-count').textContent = String(pastChats.length);
+    document.getElementById('profile-past-chat-count').textContent = String(Math.max(0, Number(pastMessageCount) || 0));
     document.getElementById('past-chat-count').textContent = String(pastChats.length);
 
     if (!pastChats.length) {
-        list.textContent = 'No past chats';
         const empty = document.createElement('div');
         empty.className = 'p-3 small text-body-secondary';
         empty.textContent = 'No past chats';
@@ -1528,8 +1520,8 @@ function renderPastChats(chats, currentChatId) {
         button.className = 'btn btn-link text-start text-decoration-none w-100 p-2';
         button.dataset.chatId = String(pastChat.id);
         button.dataset.chatStatus = pastChat.status || 'closed';
-        const date = pastChat.date ? new Date(pastChat.date).toLocaleString() : 'Previous conversation';
-        button.textContent = `${date} - ${pastChat.preview || 'No messages'}`;
+        button.textContent = pastChat.preview || 'Open past conversation';
+        button.setAttribute('aria-label', `Open past conversation: ${button.textContent}`);
         button.addEventListener('click', () => {
             const current = currentChatId ? openChatTabs.get(String(currentChatId)) : null;
             if (currentChatId) currentInboxChatId = String(currentChatId);
@@ -1539,15 +1531,24 @@ function renderPastChats(chats, currentChatId) {
                 current?.contact || (currentChatId ? getChatContact(currentChatId)?.dataset : null) || null,
                 true
             );
-            navList.classList.remove('show');
         });
         return button;
     };
-
     pastChats.forEach(pastChat => {
-        list.appendChild(makePastChatButton(pastChat));
         navList.appendChild(makePastChatButton(pastChat));
     });
+}
+
+function updateCurrentInboxChat(profile) {
+    const visitorId = String(profile.visitor.id);
+    if (currentInboxVisitorId !== visitorId) {
+        currentInboxChatId = null;
+    }
+    currentInboxVisitorId = visitorId;
+    if (profile.current_chat?.id) {
+        currentInboxChatId = String(profile.current_chat.id);
+    }
+    document.getElementById('current-chat-tab').disabled = !currentInboxChatId;
 }
 
 async function loadVisitorProfile(chatId) {
@@ -1565,9 +1566,7 @@ async function loadVisitorProfile(chatId) {
         const profile = await response.json();
         if (requestId !== profileRequestId || String(window.chatId) !== String(chatId)) return;
 
-        currentInboxVisitorId = String(profile.visitor.id);
-        currentInboxChatId = profile.current_chat?.id ? String(profile.current_chat.id) : null;
-        document.getElementById('current-chat-tab').disabled = !currentInboxChatId;
+        updateCurrentInboxChat(profile);
         const visitor = profile.visitor;
         updateSidebar({
             visitorId: visitor.id,
@@ -1611,7 +1610,7 @@ async function loadVisitorProfile(chatId) {
             : '-';
         document.getElementById('profile-source').textContent = visitor.source || 'Direct';
         document.getElementById('profile-keyword').textContent = visitor.keyword || '-';
-        renderPastChats(profile.past_chats, currentInboxChatId);
+        renderPastChats(profile.past_chats, currentInboxChatId, profile.past_message_count);
     } catch (error) {
         if (requestId !== profileRequestId) return;
         console.error('Unable to load visitor profile:', error);

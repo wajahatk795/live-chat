@@ -23,10 +23,10 @@ class MessageController extends Controller
             return response()->json(['error' => 'Chat not found'], 404);
         }
 
-        if ($chat->isPastConversation()) {
+        if ($chat->status !== 'open') {
             return response()->json([
                 'error' => true,
-                'message' => 'Past conversations are read-only.',
+                'message' => 'This conversation is closed.',
             ], 403);
         }
 
@@ -83,6 +83,7 @@ class MessageController extends Controller
             'sender'  => auth()->id(),
             'message' => $request->message
         ]);
+        $chat->update(['last_agent_activity_at' => now()]);
 
         $messageData = [
             'chat_id' => $chat->id,

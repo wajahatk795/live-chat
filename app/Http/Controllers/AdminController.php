@@ -217,13 +217,20 @@ class AdminController extends Controller
         $currentChat = Chat::where('visitor_id', $chat->visitor_id)
             ->where('brand_id', $chat->brand_id)
             ->where('status', 'open')
-            ->where(function ($query) use ($pastChatsBefore) {
-                $this->whereRecentChatActivity($query, $pastChatsBefore);
-            })
             ->withMax('messages', 'created_at')
             ->get()
             ->sortByDesc(fn (Chat $currentChat) => $this->chatActivityAt($currentChat))
             ->first();
+
+        $chatIds = Chat::where('visitor_id', $chat->visitor_id)
+            ->where('brand_id', $chat->brand_id)
+            ->select('id');
+        $pastMessageCount = Message::whereIn('chat_id', $chatIds)
+            ->where('created_at', '<=', $pastChatsBefore)
+            ->where(function ($query) {
+                $query->whereNotNull('sender')->orWhere('is_ai', true);
+            })
+            ->count();
 
         $pastChatQuery = Chat::where('visitor_id', $chat->visitor_id)
             ->where('brand_id', $chat->brand_id)
@@ -293,6 +300,7 @@ class AdminController extends Controller
                 'status' => $currentChat?->status,
             ],
             'past_chats' => $pastChats,
+            'past_message_count' => $pastMessageCount,
         ]);
     }
 
@@ -347,19 +355,6 @@ class AdminController extends Controller
             $user->role == 1 || $user->auth_brands()->where('brand.id', $chat->brand_id)->exists(),
             403
         );
-    }
-
-    private function whereRecentChatActivity($query, Carbon $cutoff): void
-    {
-        $query->where('last_visitor_activity_at', '>', $cutoff)
-            ->orWhere('last_agent_activity_at', '>', $cutoff)
-            ->orWhereHas('messages', fn ($messages) => $messages->where('created_at', '>', $cutoff))
-            ->orWhere(function ($fallback) use ($cutoff) {
-                $fallback->whereNull('last_visitor_activity_at')
-                    ->whereNull('last_agent_activity_at')
-                    ->whereDoesntHave('messages')
-                    ->whereRaw('COALESCE(closed_at, updated_at) > ?', [$cutoff]);
-            });
     }
 
     private function wherePastChatActivity($query, Carbon $cutoff): void

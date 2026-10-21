@@ -304,6 +304,7 @@ class ChatHistoryTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('current_chat.id', $currentChat->id)
+            ->assertJsonPath('past_message_count', 2)
             ->assertJsonFragment(['id' => $pastChat->id, 'preview' => 'I was here last week'])
             ->assertJsonFragment(['id' => $oldOpenChat->id, 'preview' => 'An older open conversation', 'status' => 'closed'])
             ->assertJsonMissing(['id' => $otherOpenChat->id])
@@ -385,6 +386,55 @@ class ChatHistoryTest extends TestCase
             ->assertOk()
             ->assertDontSee('form-send-message')
             ->assertDontSee('message-input');
+    }
+
+    public function test_old_open_conversation_remains_current_and_profile_counts_old_messages(): void
+    {
+        $brand = Brand::create(['name' => 'Old open chat brand', 'status' => 1]);
+        $visitor = Visitor::create([
+            'brand_id' => $brand->id,
+            'session_id' => 'old-open-current-visitor',
+        ]);
+        $visitorUser = User::create([
+            'name' => 'Old open visitor',
+            'email' => 'old-open-visitor@example.com',
+            'password' => 'password',
+            'role' => 3,
+            'visitor_id' => $visitor->id,
+        ]);
+        $agent = User::create([
+            'name' => 'Old open agent',
+            'email' => 'old-open-agent@example.com',
+            'password' => 'password',
+            'role' => 2,
+        ]);
+        $agent->auth_brands()->attach($brand->id);
+        $chat = Chat::create([
+            'visitor_id' => $visitor->id,
+            'brand_id' => $brand->id,
+            'agent_id' => $agent->id,
+            'status' => 'open',
+            'last_visitor_activity_at' => now()->subWeeks(2),
+            'created_at' => now()->subWeeks(2),
+            'updated_at' => now()->subWeeks(2),
+        ]);
+        $this->createMessageAt([
+            'chat_id' => $chat->id,
+            'sender' => $visitorUser->id,
+            'message' => 'Old visitor message',
+        ], now()->subWeeks(2));
+
+        $this->actingAs($agent)
+            ->getJson(route('admin.chat.profile', $chat->id, false))
+            ->assertOk()
+            ->assertJsonPath('current_chat.id', $chat->id)
+            ->assertJsonPath('past_message_count', 1);
+
+        $this->postJson(route('admin.chat.send', [], false), [
+            'chat_id' => $chat->id,
+            'message' => 'Reply to old open chat',
+        ])->assertOk()
+            ->assertJsonPath('message.message', 'Reply to old open chat');
     }
 
     public function test_current_and_past_views_filter_messages_by_the_one_week_cutoff(): void
