@@ -340,12 +340,6 @@
                             </form>
                         </div>
                         <div class="tab-pane fade" id="install-script" role="tabpanel">
-                            @php
-                                $url = url('').'/widget/'.$widget;
-                                $script = '<!--Start of Live Chat -->
-<script src="'.$url.'?brand='.$brand->id.'"></script>
-<!-- End of Live Chat -->';
-                            @endphp
                             <div class="install-wrapper mt-4">
                                 <a href="{{ route('admin.brand') }}" class="tab-back-btn">
                                     ← Back

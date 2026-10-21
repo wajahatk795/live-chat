@@ -73,12 +73,21 @@
         </li>
 
         <!-- Chat (including all chat routes) -->
-        <li class="menu-item {{ request()->routeIs('admin.chat*') ? 'active' : '' }}">
+        <li class="menu-item {{ request()->routeIs('admin.chat', 'admin.chat.*') ? 'active' : '' }}">
             <a href="{{ route('admin.chat') }}" class="menu-link">
                 <i class="menu-icon bx bx-chat"></i>
                 <div>Chat</div>
             </a>
         </li>
+
+        @if((int) auth()->user()->role === 2)
+            <li class="menu-item {{ request()->routeIs('admin.chat-shortcuts*') ? 'active' : '' }}">
+                <a href="{{ route('admin.chat-shortcuts.index') }}" class="menu-link">
+                    <i class="menu-icon bx bx-bolt"></i>
+                    <div>Shortcuts</div>
+                </a>
+            </li>
+        @endif
 
         <!-- Agent/Users (including create, edit, show, etc) -->
         @if(auth()->user()->role == 1)

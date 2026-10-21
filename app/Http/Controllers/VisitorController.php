@@ -39,6 +39,12 @@ class VisitorController extends Controller
                 return $visitor->user->phone ?? '<span class="text-muted">N/A</span>';
             })
             ->addColumn('actions', function ($visitor) {
+                $editAction = (int) auth()->user()->role === 2
+                    ? '<a class="dropdown-item" href="' . route('admin.visitor.edit', $visitor->id) . '">
+                            <i class="bx bx-edit me-2"></i> Edit
+                        </a>'
+                    : '';
+
                 return '
                 <div class="dropdown">
                     <button type="button"
@@ -47,9 +53,7 @@ class VisitorController extends Controller
                         <i class="bx bx-dots-vertical-rounded"></i>
                     </button>
                     <div class="dropdown-menu dropdown-menu-end">
-                        <a class="dropdown-item" href="' . route('admin.visitor.edit', $visitor->id) . '">
-                            <i class="bx bx-edit me-2"></i> Edit
-                        </a>
+                        ' . $editAction . '
                         <form action="' . route('admin.visitor.destroy', $visitor->id) . '" method="POST" style="display:inline;">
                             <input type="hidden" name="_token" value="' . csrf_token() . '">
                             <input type="hidden" name="_method" value="DELETE">
@@ -70,6 +74,8 @@ class VisitorController extends Controller
      */
     public function edit($id)
     {
+        abort_unless((int) auth()->user()->role === 2, 403, 'Administrators can view visitor profiles but cannot update them.');
+
         // Sirf visitor ka data lao with user
         $visitor = Visitor::with(['user'])->findOrFail($id);
 
@@ -81,6 +87,8 @@ class VisitorController extends Controller
      */
     public function update(Request $request, $id)
     {
+        abort_unless((int) auth()->user()->role === 2, 403, 'Administrators can view visitor profiles but cannot update them.');
+
         $visitor = Visitor::with('user')->findOrFail($id);
 
         $validator = Validator::make($request->all(), [

@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\Http;
 
 class VisitorController extends Controller
 {
+    private const CHAT_IDLE_TIMEOUT_HOURS = 24;
+
     public function getChatBySession(Request $request)
     {
         $request->validate([
@@ -120,21 +122,12 @@ class VisitorController extends Controller
             ], 404);
         }
 
-        $chat = Chat::with('agent', 'visitor', 'get_brand')->where('visitor_id', $visitor->id)->latest()->first();
+        $visitor->last_seen_at = now();
+        $visitor->save();
 
-        if (!$chat || $chat->status === 'closed') {
-            $chat = Chat::create([
-                'visitor_id' => $visitor->id,
-                'brand_id' => $visitor->brand_id,
-                'agent_id' => $chat->agent_id ?? 1,
-                'status' => 'open',
-                'last_visitor_activity_at' => now()
-            ]);
-        } else {
-            $chat->update([
-                'last_visitor_activity_at' => now()
-            ]);
-        }
+        $chat = $this->getOrCreateCurrentChat($visitor);
+        $chat->load('agent', 'visitor', 'get_brand');
+        $chat->update(['last_visitor_activity_at' => now()]);
 
 
         $roleId = optional($visitor->user)->role;
@@ -145,6 +138,9 @@ class VisitorController extends Controller
             'sender' => $userId,
             'message' => $request->message
         ]);
+
+        $brand = $chat->get_brand ?: ($chat->brand ?: Brand::find($chat->brand_id));
+        $brandUserIds = $brand ? $brand->users->pluck('id')->all() : [];
 
         emit_pusher_notification(
             'chat.' . $chat->id, // channel
@@ -163,8 +159,26 @@ class VisitorController extends Controller
             ]
         );
 
+        emit_pusher_notification(
+            'admin-notifications',
+            'visitor-message',
+            [
+                'chat' => [
+                    'id' => $chat->id,
+                ],
+                'visitor' => [
+                    'id' => $visitor->id,
+                ],
+                'message' => [
+                    'id' => $msg->id,
+                    'message' => $request->message,
+                    'formatted_created_at' => $msg->formatted_created_at,
+                ],
+                'user_ids' => $brandUserIds,
+            ]
+        );
+
         // Check if AI is enabled for this brand and set up delayed AI handoff
-        $brand = $chat->get_brand ?: ($chat->brand ?: Brand::find($chat->brand_id));
         $settings = $brand ? ($brand->chatSetting ?: \App\Models\ChatSetting::where('brand_id', $brand->id)->first()) : null;
 
         Log::info("VisitorController: Visitor message received for Chat #{$chat->id}, Brand #{$brand?->id}, ai_enabled: " . ($settings?->ai_enabled ? 'true' : 'false'));
@@ -232,7 +246,9 @@ class VisitorController extends Controller
     {
         $request->validate([
             'domain' => 'required',
-            'session_id' => 'required'
+            'session_id' => 'required',
+            'referrer' => 'nullable|url|max:2048',
+            'landing_url' => 'nullable|url|max:2048',
         ]);
 
         $ip = $request->ip();
@@ -247,8 +263,17 @@ class VisitorController extends Controller
 
         // 🔹 Location using IP API
         $location = Http::get("http://ip-api.com/json/{$ip}")->json();
+        if (
+            app()->environment('local')
+            && in_array($ip, ['127.0.0.1', '::1'], true)
+            && (($location['status'] ?? null) !== 'success' || empty($location['countryCode']))
+        ) {
+            $location = Http::get('http://ip-api.com/json/')->json();
+        }
 
         $country = $location['country'] ?? null;
+        $countryCode = strtoupper((string) ($location['countryCode'] ?? ''));
+        $countryCode = preg_match('/^[A-Z]{2}$/', $countryCode) ? $countryCode : null;
         $city = $location['city'] ?? null;
 
         // 1️⃣ Website
@@ -314,13 +339,24 @@ class VisitorController extends Controller
             ['brand_id' => $brand->id] //website is like brand_id
         );
 
+        if ($visitor->wasRecentlyCreated || (!$visitor->source && !$visitor->keyword)) {
+            [$source, $keyword] = $this->resolveVisitorAttribution(
+                $request->input('referrer'),
+                $request->input('landing_url')
+            );
+            $visitor->source = $source;
+            $visitor->keyword = $keyword;
+        }
+
         $visitor->update([
             'ip_address' => $ip,
             'country' => $country,
+            'country_code' => $countryCode,
             'city' => $city,
             'device' => $device,
             'browser' => $browser,
             'os' => $os,
+            'last_seen_at' => now(),
         ]);
 
         $visitorUser = User::firstOrCreate(
@@ -333,16 +369,8 @@ class VisitorController extends Controller
             ]
         );
 
-        $chat = Chat::firstOrCreate(
-            [
-                'visitor_id' => $visitor->id,
-                'brand_id' => $visitor->brand_id,
-                'status' => 'open',
-            ],
-            [
-                'last_visitor_activity_at' => now()  // sirf create hote waqt set hoga
-            ]
-        );
+        $chat = $this->getOrCreateCurrentChat($visitor);
+        $chat->update(['last_visitor_activity_at' => now()]);
 
         $settings = $brand->chatSetting;
 
@@ -403,6 +431,82 @@ class VisitorController extends Controller
                 'chat_position' => $settings->chat_position ?? 'right',
             ]
         ]);
+    }
+
+    private function resolveVisitorAttribution(?string $referrer, ?string $landingUrl): array
+    {
+        $referrerHost = $referrer ? parse_url($referrer, PHP_URL_HOST) : null;
+        $referrerHost = is_string($referrerHost) ? strtolower(preg_replace('/^www\./', '', $referrerHost)) : null;
+
+        $landingQuery = $landingUrl ? parse_url($landingUrl, PHP_URL_QUERY) : null;
+        $referrerQuery = $referrer ? parse_url($referrer, PHP_URL_QUERY) : null;
+        parse_str(is_string($landingQuery) ? $landingQuery : '', $landingParams);
+        parse_str(is_string($referrerQuery) ? $referrerQuery : '', $referrerParams);
+
+        $source = $landingParams['utm_source'] ?? null;
+        if (!$source && $referrerHost) {
+            $source = $referrerHost;
+        }
+        if (!is_string($source) || trim($source) === '') {
+            $source = null;
+        }
+
+        $keyword = $landingParams['utm_term'] ?? null;
+        if (!is_string($keyword) || trim($keyword) === '') {
+            $keyword = null;
+            foreach (['q', 'query', 'p', 'text', 'search_query'] as $key) {
+                if (!empty($referrerParams[$key]) && is_string($referrerParams[$key])) {
+                    $keyword = $referrerParams[$key];
+                    break;
+                }
+            }
+        }
+
+        return [
+            $source ? mb_substr($source, 0, 255) : ($referrerHost ?: 'Direct'),
+            $keyword ? mb_substr($keyword, 0, 255) : null,
+        ];
+    }
+
+    private function getOrCreateCurrentChat(Visitor $visitor): Chat
+    {
+        $openChats = Chat::where('visitor_id', $visitor->id)
+            ->where('brand_id', $visitor->brand_id)
+            ->where('status', 'open');
+        $inactiveSince = now()->subHours(self::CHAT_IDLE_TIMEOUT_HOURS);
+
+        (clone $openChats)
+            ->where(function ($query) use ($inactiveSince) {
+                $query->where('last_visitor_activity_at', '<=', $inactiveSince)
+                    ->orWhere(function ($query) use ($inactiveSince) {
+                        $query->whereNull('last_visitor_activity_at')
+                            ->where('created_at', '<=', $inactiveSince);
+                    });
+            })
+            ->update([
+                'status' => 'closed',
+                'closed_at' => now(),
+                'closed_reason' => 'inactive',
+            ]);
+
+        $chat = $openChats->latest('id')->first();
+
+        if (!$chat) {
+            $agentId = Chat::where('visitor_id', $visitor->id)
+                ->where('brand_id', $visitor->brand_id)
+                ->latest('id')
+                ->value('agent_id');
+
+            $chat = Chat::create([
+                'visitor_id' => $visitor->id,
+                'brand_id' => $visitor->brand_id,
+                'agent_id' => $agentId ?? 1,
+                'status' => 'open',
+                'last_visitor_activity_at' => now(),
+            ]);
+        }
+
+        return $chat;
     }
 
     public function typing(Request $request)
@@ -504,6 +608,7 @@ class VisitorController extends Controller
             return response()->json(['status' => false]);
 
         $visitor->last_url = $request->url;
+        $visitor->last_seen_at = now();
         $visitor->save();
 
         $chat = Chat::where('visitor_id', $visitor->id)->where('status', 'open')->first();
@@ -534,6 +639,9 @@ class VisitorController extends Controller
         $visitor = Visitor::where('session_id', $request->session_id)->first();
         if (!$visitor)
             return response()->json();
+
+        $visitor->last_seen_at = now();
+        $visitor->save();
 
         $chat = Chat::where('visitor_id', $visitor->id)
             ->where('status', 'open')

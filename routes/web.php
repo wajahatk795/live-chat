@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ChatShortcutController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\RegisterController;
@@ -67,7 +68,16 @@ Route::middleware(['auth', 'role:1,2', 'lastseen'])->prefix('admin')->group(func
 
     Route::get('chat', [AdminController::class, 'chat'])->name('admin.chat');
     Route::get('chat/{chatId}', [AdminController::class, 'show'])->name('admin.chat.show');
+    Route::get('chat/{chatId}/profile', [AdminController::class, 'chatProfile'])->name('admin.chat.profile');
+    Route::patch('chat/{chatId}/profile', [AdminController::class, 'updateChatProfile'])->name('admin.chat.profile.update');
     Route::get('chat/{chatId}/messages', [AdminController::class, 'messages'])->name('admin.chat.messages');
+    Route::get('chat/{chatId}/shortcuts', [ChatShortcutController::class, 'index'])->name('admin.chat.shortcuts');
+    Route::post('chat/{chatId}/shortcuts', [ChatShortcutController::class, 'store'])->name('admin.chat.shortcuts.store');
+    Route::put('chat/{chatId}/shortcuts/{shortcutId}', [ChatShortcutController::class, 'update'])->name('admin.chat.shortcuts.update');
+    Route::delete('chat-shortcuts/{shortcutId}', [ChatShortcutController::class, 'destroy'])->name('admin.chat.shortcuts.destroy');
+    Route::get('chat-shortcuts', [ChatShortcutController::class, 'manage'])->name('admin.chat-shortcuts.index');
+    Route::post('chat-shortcuts', [ChatShortcutController::class, 'manageStore'])->name('admin.chat-shortcuts.store');
+    Route::put('chat-shortcuts/{shortcutId}', [ChatShortcutController::class, 'manageUpdate'])->name('admin.chat-shortcuts.update');
 
     Route::post('send-message', [MessageController::class, 'send'])->name('admin.chat.send');
     Route::post('chat/start', [MessageController::class, 'chartStart'])->name('admin.chat.start');

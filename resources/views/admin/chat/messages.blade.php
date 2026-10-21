@@ -5,9 +5,16 @@
                 <i class="icon-base bx bx-menu icon-lg cursor-pointer d-lg-none d-block me-4"
                     data-bs-toggle="sidebar" data-overlay="" data-target="#app-chat-contacts"></i>
                 <div class="flex-shrink-0 avatar avatar-online">
-                    <img src="{{ $user->image ? asset($user->image) : asset('assets/images/default.png')  }}"
-                        alt="Avatar" class="rounded-circle" data-bs-toggle="sidebar" data-overlay=""
-                        data-target="#app-chat-sidebar-right">
+                    @if(preg_match('/^[A-Za-z]{2}$/', (string) ($chat->main_visitor->country_code ?? '')))
+                        <img src="https://flagcdn.com/w40/{{ strtolower($chat->main_visitor->country_code) }}.png"
+                            alt="{{ $chat->main_visitor->country ?? 'Visitor country' }} flag"
+                            class="rounded-circle visitor-country-flag"
+                            data-bs-toggle="sidebar" data-overlay="" data-target="#app-chat-sidebar-right">
+                    @else
+                        <img src="{{ $user->image ? asset($user->image) : asset('assets/images/default.png')  }}"
+                            alt="Avatar" class="rounded-circle" data-bs-toggle="sidebar" data-overlay=""
+                            data-target="#app-chat-sidebar-right">
+                    @endif
                 </div>
                 <div class="chat-contact-info flex-grow-1 ms-4">
                     <h6 class="m-0 fw-normal">{{ $user->name }}</h6>
@@ -58,7 +65,7 @@
         </div>
     </div>
     <!-- Chat message form -->
-    @if(auth()->user()->role == 2)
+    @if((int) auth()->user()->role === 2)
         <div class="chat-history-footer shadow-xs">
             <form class="form-send-message d-flex justify-content-between align-items-center " data-chat-id="{{ $chatId }}">
                 <input class="form-control message-input border-0 me-4 shadow-none"
@@ -73,6 +80,15 @@
                     </button>
                 </div>
             </form>
+            @if((int) auth()->user()->role === 2)
+                <div class="chat-shortcut-tools">
+                    <div class="chat-shortcut-panel" hidden>
+                        <div class="chat-shortcut-list" role="listbox"></div>
+                        <div class="small text-danger chat-shortcut-status" role="status" aria-live="polite"></div>
+                    </div>
+                </div>
+            @endif
+            <div class="small text-danger mt-2 send-message-status" role="status" aria-live="polite"></div>
         </div>
     @endif
 </div>

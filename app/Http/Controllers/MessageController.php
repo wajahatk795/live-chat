@@ -11,21 +11,16 @@ class MessageController extends Controller
 {
     public function send(Request $request)
     {
+        abort_unless((int) auth()->user()->role === 2, 403, 'Administrators can view chats but cannot send replies.');
+
         $request->validate([
-            'chat_id' => 'required',
+            'chat_id' => 'required|integer|exists:chats,id',
+            'message' => 'required|string|max:5000',
         ]);
 
         $chat = Chat::with('visitor', 'agent')->find($request->chat_id);
         if(!$chat){
             return response()->json(['error' => 'Chat not found'], 404);
-        }
-
-        // 🚫 Admin (Role 1) cannot send messages
-        if (auth()->user()->role == 1) {
-            return response()->json([
-                'error' => true,
-                'message' => 'Admin cannot send messages directly in chats.'
-            ], 403);
         }
 
         // 🚫 Block agent from sending while AI is processing a response
@@ -76,35 +71,37 @@ class MessageController extends Controller
             ]);
         }
 
-        $visitorId = $chat->visitor->id;
-        $roleId = $chat->visitor->role;
-
         $msg = Message::create([
-            'chat_id' => $request->chat_id,
+            'chat_id' => $chat->id,
             'sender'  => auth()->id(),
             'message' => $request->message
         ]);
 
+        $messageData = [
+            'chat_id' => $chat->id,
+            'message' => $msg->message,
+            'role' => auth()->user()->role ?? 2,
+            'formatted_created_at' => $msg->formatted_created_at,
+            'created_at' => $msg->created_at,
+            'id' => $msg->id,
+            'is_read' => (bool) $msg->is_read,
+            'user' => [
+                'id' => auth()->id(),
+                'image' => auth()->user()->image ?? null,
+                'name' => auth()->user()->name ?? '',
+            ],
+        ];
+
         emit_pusher_notification(
             'chat.' . $chat->id,
             'new-message',
-            [
-                'chat_id' => $chat->id,
-                'message' => $request->message,
-                'role'  => auth()->user()->role ?? 2,
-                'formatted_created_at'  => $msg->formatted_created_at,
-                'created_at'  => $msg->created_at,
-                'id' => $msg->id,
-                'is_read' => false,
-                'user' => [
-                    'id' => auth()->id(),
-                    'image' => auth()->user()->image ?? null,
-                    'name' => auth()->user()->name ?? '',
-                ]
-            ]
+            $messageData
         );
 
-        return response()->json(['status' => 'sent']);
+        return response()->json([
+            'status' => 'sent',
+            'message' => $messageData,
+        ]);
     }
 
     public function chartStart(Request $request)

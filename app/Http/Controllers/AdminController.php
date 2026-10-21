@@ -187,6 +187,125 @@ class AdminController extends Controller
         return view('admin.chat.messages', compact('chatId', 'user', 'chat'));
     }
 
+    public function chatProfile($chatId)
+    {
+        $chat = Chat::with('main_visitor')->findOrFail($chatId);
+        $this->authorizeChatProfile($chat);
+
+        $visitor = $chat->main_visitor;
+        abort_unless($visitor, 404);
+        $user = User::where('visitor_id', $chat->visitor_id)->firstOrFail();
+        $currentChat = Chat::where('visitor_id', $chat->visitor_id)
+            ->where('brand_id', $chat->brand_id)
+            ->where('status', 'open')
+            ->latest('updated_at')
+            ->first(['id', 'status']);
+
+        $pastChats = Chat::where('visitor_id', $chat->visitor_id)
+            ->where('brand_id', $chat->brand_id)
+            ->where('status', 'closed')
+            ->orderByRaw('COALESCE(last_visitor_activity_at, closed_at, updated_at) DESC')
+            ->get(['id', 'status', 'created_at', 'updated_at', 'last_visitor_activity_at', 'closed_at'])
+            ->map(function ($pastChat) {
+                return [
+                    'id' => $pastChat->id,
+                    'status' => $pastChat->status,
+                    'date' => optional($pastChat->last_visitor_activity_at ?? $pastChat->closed_at ?? $pastChat->updated_at)->toIso8601String(),
+                    'preview' => $pastChat->messages()->whereNotNull('sender')->latest()->value('message') ?? 'No messages',
+                ];
+            });
+
+        $lastActivity = $visitor->last_seen_at
+            ?? $chat->last_visitor_activity_at
+            ?? $visitor->created_at;
+
+        return response()->json([
+            'visitor' => [
+                'id' => $visitor->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'address' => $user->address,
+                'notes' => $visitor->notes ?? $user->about,
+                'tags' => $visitor->tags ?? [],
+                'source' => $visitor->source,
+                'keyword' => $visitor->keyword,
+                'avatar' => $user->image ? asset($user->image) : asset('assets/images/default.png'),
+                'ip_address' => $visitor->ip_address,
+                'country' => $visitor->country,
+                'country_code' => $visitor->country_code,
+                'city' => $visitor->city,
+                'device' => $visitor->device,
+                'browser' => $visitor->browser,
+                'os' => $visitor->os,
+                'last_url' => $visitor->last_url,
+                'session_started_at' => optional($visitor->created_at)->toIso8601String(),
+                'last_seen_at' => optional($lastActivity)->toIso8601String(),
+                'session_duration_seconds' => $visitor->created_at
+                    ? max(0, $visitor->created_at->diffInSeconds($lastActivity))
+                    : 0,
+            ],
+            'current_chat' => [
+                'id' => $currentChat?->id,
+                'status' => $currentChat?->status,
+            ],
+            'past_chats' => $pastChats,
+        ]);
+    }
+
+    public function updateChatProfile(Request $request, $chatId)
+    {
+        abort_unless((int) auth()->user()->role === 2, 403, 'Administrators can view visitor profiles but cannot update them.');
+
+        $chat = Chat::with('main_visitor')->findOrFail($chatId);
+        $this->authorizeChatProfile($chat);
+        abort_unless($chat->main_visitor, 404);
+        $user = User::where('visitor_id', $chat->visitor_id)->firstOrFail();
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|max:30',
+            'address' => 'nullable|string|max:255',
+            'notes' => 'nullable|string|max:5000',
+            'tags' => 'nullable|array|max:20',
+            'tags.*' => 'string|max:40',
+        ]);
+
+        $userUpdates = ['name' => $validated['name']];
+        foreach (['email', 'phone', 'address'] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $userUpdates[$field] = $validated[$field];
+            }
+        }
+        $user->update($userUpdates);
+
+        $visitorUpdates = [];
+        if (array_key_exists('notes', $validated)) {
+            $visitorUpdates['notes'] = $validated['notes'];
+        }
+        if (array_key_exists('tags', $validated)) {
+            $visitorUpdates['tags'] = array_values(array_unique(array_filter(array_map('trim', $validated['tags'] ?? []))));
+        }
+        if ($visitorUpdates) {
+            $chat->main_visitor->update($visitorUpdates);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Visitor profile saved.',
+        ]);
+    }
+
+    private function authorizeChatProfile(Chat $chat): void
+    {
+        $user = auth()->user();
+        abort_unless(
+            $user->role == 1 || $user->auth_brands()->where('brand.id', $chat->brand_id)->exists(),
+            403
+        );
+    }
+
     public function messages(Request $request, $chatId)
     {
         $limit = $request->get('limit', 20);

@@ -2,11 +2,38 @@
 
 namespace App\Models;
 
+use App\Support\CountryCode;
 use Illuminate\Database\Eloquent\Model;
 
 class Visitor extends Model
 {
-    protected $fillable = ['brand_id', 'session_id', 'last_url', 'ip_address', 'country', 'city', 'device', 'browser', 'os'];
+    protected $fillable = [
+        'brand_id',
+        'session_id',
+        'last_url',
+        'source',
+        'keyword',
+        'ip_address',
+        'country',
+        'country_code',
+        'city',
+        'device',
+        'browser',
+        'os',
+        'notes',
+        'tags',
+        'last_seen_at',
+    ];
+
+    protected $casts = [
+        'tags' => 'array',
+        'last_seen_at' => 'datetime',
+    ];
+
+    public function getCountryCodeAttribute($value): ?string
+    {
+        return CountryCode::resolve($value, $this->attributes['country'] ?? null);
+    }
 
     protected static function boot()
     {

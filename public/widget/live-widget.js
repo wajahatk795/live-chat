@@ -22,13 +22,14 @@
 
     const WEBSITE_DOMAIN = window.location.hostname;
     let currentUrl = window.location.href;
-    const BASE_URL = "https://democustom-html.com/custom-backend/live-chat/public";
+    const BASE_URL = new URL("..", document.currentScript.src).href.replace(/\/$/, "");
 
-    let SESSION_ID = sessionStorage.getItem("chat_session_id");
+    let SESSION_ID = localStorage.getItem("chat_session_id");
     if (!SESSION_ID) {
-        SESSION_ID = Math.random().toString(36).substring(2);
-        sessionStorage.setItem("chat_session_id", SESSION_ID);
+        SESSION_ID = sessionStorage.getItem("chat_session_id") || Math.random().toString(36).substring(2);
+        localStorage.setItem("chat_session_id", SESSION_ID);
     }
+    sessionStorage.setItem("chat_session_id", SESSION_ID);
 
     const PUSHER_KEY = "cb8bbfac1fbb781fcaa7";
     const PUSHER_CLUSTER = "mt1";
@@ -696,6 +697,8 @@
                 domain: getWebsiteDomain(),
                 session_id: SESSION_ID,
                 url: currentUrl,
+                referrer: document.referrer || null,
+                landing_url: window.location.href,
             }),
         })
             .then((res) => res.json())

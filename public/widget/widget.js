@@ -22,13 +22,14 @@
 
     const WEBSITE_DOMAIN = window.location.hostname;
     let currentUrl = window.location.href;
-    const BASE_URL = "http://localhost/live-chat/public";
+    const BASE_URL = new URL("..", document.currentScript.src).href.replace(/\/$/, "");
 
-    let SESSION_ID = sessionStorage.getItem("chat_session_id");
+    let SESSION_ID = localStorage.getItem("chat_session_id");
     if (!SESSION_ID) {
-        SESSION_ID = Math.random().toString(36).substring(2);
-        sessionStorage.setItem("chat_session_id", SESSION_ID);
+        SESSION_ID = sessionStorage.getItem("chat_session_id") || Math.random().toString(36).substring(2);
+        localStorage.setItem("chat_session_id", SESSION_ID);
     }
+    sessionStorage.setItem("chat_session_id", SESSION_ID);
 
     const PUSHER_KEY = "6d2b8f974bbba728216c";
     const PUSHER_CLUSTER = "ap1";
@@ -695,6 +696,8 @@
                 domain: getWebsiteDomain(),
                 session_id: SESSION_ID,
                 url: currentUrl,
+                referrer: document.referrer || null,
+                landing_url: window.location.href,
             }),
         })
             .then((res) => res.json())

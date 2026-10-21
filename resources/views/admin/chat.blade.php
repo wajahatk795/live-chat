@@ -2,9 +2,301 @@
 
 @section('css')
 <style>
+    .zendesk-chat-layout {
+        width: 100%;
+        max-width: 100%;
+        height: calc(100vh - 11.3rem);
+        min-height: 520px;
+    }
+
+    .zendesk-chat-layout > .row {
+        display: flex;
+        height: 100%;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        min-width: 0;
+    }
+
+    .zendesk-chat-layout > .row > .app-chat-contacts {
+        position: relative;
+        display: flex !important;
+        flex: 0 0 21rem !important;
+        width: 21rem !important;
+        min-width: 21rem;
+        max-width: none;
+        box-sizing: border-box;
+        height: 100%;
+        flex-direction: column;
+        inset: auto;
+    }
+
+    .zendesk-chat-layout .app-chat-contacts .sidebar-header {
+        flex: 0 0 auto;
+    }
+
+    .zendesk-chat-layout .app-chat-contacts .sidebar-body {
+        height: auto !important;
+        min-height: 0;
+        flex: 1 1 auto;
+    }
+
+    .zendesk-chat-layout > .row > .chat-main-panel {
+        flex: 1 1 0 !important;
+        width: 0;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .zendesk-chat-layout > .row > .app-chat-sidebar-right {
+        position: relative !important;
+        inset: auto !important;
+        display: flex !important;
+        flex: 0 0 19rem !important;
+        width: 19rem !important;
+        min-width: 19rem;
+        max-width: none;
+        box-sizing: border-box;
+        height: 100%;
+        flex-direction: column;
+        transform: none !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto;
+        border-left: 1px solid var(--bs-border-color);
+        background: var(--bs-body-bg);
+    }
+
+    .zendesk-chat-layout .app-chat-sidebar-right .sidebar-header {
+        position: relative;
+        flex: 0 0 auto;
+        padding: 1rem !important;
+        border-bottom: 1px solid var(--bs-border-color);
+    }
+
+    .zendesk-chat-layout .app-chat-sidebar-right .sidebar-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto !important;
+        padding: 0.9rem !important;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .zendesk-chat-layout .app-chat-sidebar-right dd {
+        overflow-wrap: anywhere;
+    }
+
+    .chat-profile-input {
+        margin-bottom: 0.55rem;
+    }
+
+    .chat-profile-section {
+        padding: 0.85rem 0;
+        border-top: 1px solid var(--bs-border-color);
+    }
+
+    .chat-profile-stat {
+        min-width: 0;
+        padding: 0.6rem 0.35rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.4rem;
+        text-align: center;
+    }
+
+    .chat-profile-stat strong,
+    .chat-profile-stat span {
+        display: block;
+    }
+
+    .chat-profile-stat span {
+        color: var(--bs-secondary-color);
+        font-size: 0.72rem;
+    }
+
+    .chat-profile-path {
+        overflow-wrap: anywhere;
+    }
+
+    .chat-profile-tag {
+        margin: 0 0.25rem 0.25rem 0;
+    }
+
+    .chat-session-navigation {
+        position: relative;
+        display: none;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 48px;
+        padding: 0.45rem 0.85rem;
+        border-bottom: 1px solid var(--bs-border-color);
+    }
+
+    .chat-session-navigation.show {
+        display: flex;
+    }
+
+    .chat-session-navigation .past-chat-list {
+        position: absolute;
+        z-index: 5;
+        top: 100%;
+        left: 0.75rem;
+        display: none;
+        width: min(350px, calc(100% - 1.5rem));
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.5rem;
+        background: var(--bs-body-bg);
+        box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.18);
+    }
+
+    .chat-session-navigation .past-chat-list.show {
+        display: block;
+    }
+
+    .chat-session-navigation .past-chat-list button {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .chat-main-panel {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        padding: 0;
+    }
+
+    .chat-main-panel > #app-chat-conversation,
+    .chat-main-panel > #app-chat-history {
+        flex: 1 1 auto;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        height: auto;
+        block-size: auto !important;
+    }
+
+    .chat-main-panel > #app-chat-history:not(.d-none) {
+        display: flex !important;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .chat-main-panel .chat-history-wrapper {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .chat-main-panel .chat-history-footer {
+        box-sizing: border-box;
+        flex: 0 0 auto;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 0.75rem 1rem !important;
+        overflow: visible;
+    }
+
+    .chat-main-panel .chat-history-footer .form-send-message {
+        display: flex;
+        justify-content: flex-start !important;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        min-width: 0;
+        margin: 0;
+        box-sizing: border-box;
+    }
+
+    .chat-main-panel .chat-history-footer .message-input {
+        flex: 1 1 auto;
+        width: 1%;
+        min-width: 0;
+        margin-right: 0 !important;
+    }
+
+    .chat-main-panel .chat-history-footer .message-actions {
+        flex: 0 0 auto;
+        gap: 0.375rem;
+        margin-left: auto;
+        margin-right: 0.5rem;
+    }
+
+    .chat-main-panel .chat-history-footer .send-message-status:empty {
+        display: none;
+    }
+
+    .chat-main-panel .emoji-picker__wrapper {
+        z-index: 1060 !important;
+    }
+
     .chat-history-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto !important;
+        block-size: auto !important;
         overflow-y: auto !important;
         scroll-behavior: smooth !important;
+    }
+
+    @media (max-width: 991.98px) {
+        .zendesk-chat-layout {
+            height: calc(100vh - 9rem);
+            min-height: 420px;
+        }
+
+        .zendesk-chat-layout .app-chat-contacts {
+            flex-basis: 14rem !important;
+            width: 14rem !important;
+            min-width: 14rem;
+        }
+
+        .zendesk-chat-layout > .row > .app-chat-sidebar-right {
+            flex-basis: 17rem !important;
+            width: 17rem !important;
+            min-width: 15rem;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .zendesk-chat-layout {
+            height: auto;
+            min-height: calc(100vh - 9rem);
+        }
+
+        .zendesk-chat-layout > .row {
+            height: auto;
+            flex-direction: column;
+            flex-wrap: nowrap;
+        }
+
+        .zendesk-chat-layout > .row > .app-chat-contacts {
+            flex: 0 0 15rem !important;
+            width: 100% !important;
+            min-width: 0;
+            height: 15rem;
+        }
+
+        .zendesk-chat-layout > .row > .chat-main-panel {
+            flex: 0 0 auto !important;
+            width: 100%;
+            height: 30rem;
+            min-height: 55vh;
+        }
+
+        .zendesk-chat-layout > .row > .app-chat-sidebar-right {
+            display: flex !important;
+            flex: 0 0 auto !important;
+            width: 100% !important;
+            min-width: 0;
+            height: auto;
+            min-height: 24rem;
+        }
     }
 
     .chat-system-message {
@@ -22,7 +314,7 @@
     <!-- Content wrapper -->
     <!-- Content -->
     <div class="container-xxl flex-grow-1 container-p-y">
-        <div class="app-chat card overflow-hidden">
+        <div class="app-chat card overflow-hidden zendesk-chat-layout">
             <div class="row g-0">
                 <!-- Sidebar Left -->
                 <div class="col app-chat-sidebar-left app-sidebar overflow-hidden" id="app-chat-sidebar-left">
@@ -160,6 +452,7 @@
                                         href="{{ route('admin.chat.show', $chat->id) }}"
                                         data-chat-id="{{ $chat->id }}"
                                         data-user-id="{{ $chat->visitor->id }}"
+                                        data-visitor-id="{{ $chat->main_visitor->id ?? '' }}"
                                         data-chat-status="{{ $chat->status }}"
                                         data-name="{{ $chat->visitor->name }}"
                                         data-email="{{ $chat->visitor->email }}"
@@ -171,12 +464,19 @@
                                         data-device="{{ $chat->main_visitor->device ?? '-' }}"
                                         data-browser="{{ $chat->main_visitor->browser ?? '-' }}"
                                         data-os="{{ $chat->main_visitor->os ?? '-' }}"
+                                        data-country-code="{{ $chat->main_visitor->country_code ?? '' }}"
                                         data-avatar="{{ $chat->visitor->image ? asset($chat->visitor->image) : asset('assets/images/default.png') }}">
 
                                         <div class="flex-shrink-0 avatar avatar-online profile-av-1">
-                                            <img src="{{ $chat->visitor->image ? asset($chat->visitor->image) : asset('assets/images/default.png')  }}"
-                                                alt="Avatar"
-                                                class="rounded-circle">
+                                            @if(preg_match('/^[A-Za-z]{2}$/', (string) ($chat->main_visitor->country_code ?? '')))
+                                                <img src="https://flagcdn.com/w40/{{ strtolower($chat->main_visitor->country_code) }}.png"
+                                                    alt="{{ $chat->main_visitor->country ?? 'Visitor country' }} flag"
+                                                    class="rounded-circle visitor-country-flag">
+                                            @else
+                                                <img src="{{ $chat->visitor->image ? asset($chat->visitor->image) : asset('assets/images/default.png')  }}"
+                                                    alt="Avatar"
+                                                    class="rounded-circle">
+                                            @endif
                                         </div>
 
                                         <div class="chat-contact-info flex-grow-1 ms-4">
@@ -222,74 +522,93 @@
                         </div>
                     </div>
                 </div>
-                <!-- Chat conversation -->
-                <div class="col app-chat-conversation d-flex align-items-center justify-content-center flex-column"
-                    id="app-chat-conversation">
-                    <div class="bg-label-primary p-8 rounded-circle">
-                        <i class="icon-base bx bx-message-alt-detail icon-48px"></i>
+                <div class="col chat-main-panel">
+                    <div class="chat-session-navigation" id="chat-session-navigation">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="current-chat-tab">Current chat</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="past-chat-toggle">
+                            Past chats <span class="badge bg-label-secondary ms-1" id="past-chat-count">0</span>
+                        </button>
+                        <div class="past-chat-list" id="past-chat-list"></div>
                     </div>
-                    <p class="my-4">Select a contact to start a conversation.</p>
-                    <button class="btn btn-primary app-chat-conversation-btn" id="app-chat-conversation-btn">Select
-                        Contact</button>
+                    <!-- Chat conversation -->
+                    <div class="app-chat-conversation d-flex align-items-center justify-content-center flex-column"
+                        id="app-chat-conversation">
+                        <div class="bg-label-primary p-8 rounded-circle">
+                            <i class="icon-base bx bx-message-alt-detail icon-48px"></i>
+                        </div>
+                        <p class="my-4">Select a contact to start a conversation.</p>
+                        <button class="btn btn-primary app-chat-conversation-btn" id="app-chat-conversation-btn">Select
+                            Contact</button>
+                    </div>
+                    <!-- /Chat conversation -->
+                    <!-- Chat History -->
+                    <div class="app-chat-history d-none" id="app-chat-history"></div>
                 </div>
-                <!-- /Chat conversation -->
-                <!-- Chat History -->
-                <div class="col app-chat-history d-none" id="app-chat-history">
-
-                </div>
-                <!-- /Chat History -->
                 <!-- Sidebar Right -->
-                <div class="col app-chat-sidebar-right app-sidebar overflow-hidden" id="app-chat-sidebar-right" data-bs-toggle="sidebar">
-                    <div class="sidebar-header d-flex flex-column justify-content-center align-items-center flex-wrap px-6 pt-12">
-                        <div class="avatar avatar-xl avatar-online chat-sidebar-avatar">
-                            <img src="" alt="Avatar" class="rounded-circle" id="sidebar-avatar">
+                <aside class="col app-chat-sidebar-right app-sidebar overflow-hidden" id="app-chat-sidebar-right">
+                    <div class="sidebar-header d-flex align-items-center">
+                        <div class="avatar avatar-md flex-shrink-0 me-3">
+                            <img src="{{ asset('assets/images/default.png') }}" alt="Visitor" class="rounded-circle" id="sidebar-avatar">
+                            <img src="" alt="Visitor country flag" class="rounded-circle visitor-country-flag" id="sidebar-avatar-flag" hidden>
                         </div>
-                        <h5 class="mt-4 mb-0" id="sidebar-name"></h5>
-                        <span id="sidebar-role"></span>
-                        <i class="icon-base bx bx-x icon-lg cursor-pointer close-sidebar d-block"
-                            data-bs-toggle="sidebar" data-overlay="" data-target="#app-chat-sidebar-right"></i>
-                    </div>
-                    <div class="sidebar-body p-6 pt-0 ps">
-                        <div class="my-6">
-                            <p class="text-uppercase mb-1 text-body-secondary">Personal Information</p>
-                            <ul class="list-unstyled d-grid gap-4 mb-0 ms-2 py-2 text-heading">
-                                <li class="d-flex align-items-center">
-                                    <i class="icon-base bx bx-envelope"></i>
-                                    <span class="align-middle ms-2" id="sidebar-email">-</span>
-                                </li>
-                                <li class="d-flex align-items-center">
-                                    <i class="icon-base bx bx-phone-call"></i>
-                                    <span class="align-middle ms-2" id="sidebar-phone">-</span>
-                                </li>
-                                <li class="d-flex align-items-center">
-                                    <i class="icon-base bx bx-map"></i>
-                                    <span class="align-middle ms-2" id="sidebar-ip-address">-</span>
-                                </li>
-                                <li class="d-flex align-items-center">
-                                    <i class="icon-base bx bx-flag"></i>
-                                    <span class="align-middle ms-2" id="sidebar-country">-</span>
-                                </li>
-                                <li class="d-flex align-items-center">
-                                    <i class="icon-base bx bx-building"></i>
-                                    <span class="align-middle ms-2" id="sidebar-city">-</span>
-                                </li>
-                                <li class="d-flex align-items-center">
-                                    <i class="icon-base bx bx-desktop"></i>
-                                    <span class="align-middle ms-2" id="sidebar-device">-</span>
-                                </li>
-                                <li class="d-flex align-items-center">
-                                    <i class="icon-base bx bx-browser"></i>
-                                    <span class="align-middle ms-2" id="sidebar-browser">-</span>
-                                </li>
-                                <li class="d-flex align-items-center">
-                                    <i class="icon-base bx bx-laptop"></i>
-                                    <span class="align-middle ms-2" id="sidebar-os">-</span>
-                                </li>
-                            </ul>
+                        <div class="overflow-hidden">
+                            <h6 class="mb-0 text-truncate" id="sidebar-name">Visitor profile</h6>
+                            <small class="text-body-secondary" id="sidebar-role">Visitor details</small>
                         </div>
-                        {{-- Options same raho --}}
                     </div>
-                </div>
+                    <div class="sidebar-body ps">
+                        <section class="chat-profile-section" aria-label="Visitor activity">
+                            <div class="d-flex gap-2">
+                                <div class="chat-profile-stat flex-fill">
+                                    <strong id="profile-past-chat-count">0</strong><span>Past chats</span>
+                                </div>
+                                <div class="chat-profile-stat flex-fill">
+                                    <strong id="profile-session-duration">-</strong><span>Time on site</span>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="chat-profile-section">
+                            <h6 class="small text-uppercase text-body-secondary mb-2">Visitor path</h6>
+                            <a class="small chat-profile-path" id="profile-visitor-path" href="#" target="_blank" rel="noopener noreferrer">No page recorded</a>
+                        </section>
+
+                        <section class="chat-profile-section">
+                            <h6 class="small text-uppercase text-body-secondary mb-2">Past chats</h6>
+                            <div class="small text-body-secondary" id="profile-past-chats">No past chats</div>
+                        </section>
+
+                        <section class="chat-profile-section">
+                            <h6 class="small text-uppercase text-body-secondary mb-2">Location & device</h6>
+                            <dl class="small mb-0">
+                                <dt>Session started</dt><dd id="profile-session-started">-</dd>
+                                <dt>Source</dt><dd id="profile-source">-</dd>
+                                <dt>Keyword</dt><dd id="profile-keyword">-</dd>
+                                <dt>Location</dt><dd id="profile-location">-</dd>
+                                <dt>Browser</dt><dd id="profile-browser">-</dd>
+                                <dt>Platform</dt><dd id="profile-os">-</dd>
+                                <dt>Device</dt><dd id="profile-device">-</dd>
+                                <dt>IP address</dt><dd id="profile-ip-address">-</dd>
+                            </dl>
+                        </section>
+
+                        <form id="visitor-profile-form" class="chat-profile-section">
+                            <input type="hidden" id="profile-visitor-id">
+                            <label class="form-label small mb-1" for="profile-name">Name</label>
+                            <input class="form-control form-control-sm chat-profile-input" id="profile-name" name="name" maxlength="255" placeholder="Add name" required @if((int) auth()->user()->role === 1) readonly @endif>
+                            <label class="form-label small mb-1" for="profile-email">Email</label>
+                            <input class="form-control form-control-sm chat-profile-input" id="profile-email" name="email" type="email" maxlength="255" placeholder="Add email" @if((int) auth()->user()->role === 1) readonly @endif>
+                            <label class="form-label small mb-1" for="profile-phone">Phone</label>
+                            <input class="form-control form-control-sm chat-profile-input" id="profile-phone" name="phone" maxlength="30" placeholder="Add phone number" @if((int) auth()->user()->role === 1) readonly @endif>
+                            <label class="form-label small mb-1" for="profile-notes">Visitor notes</label>
+                            <textarea class="form-control form-control-sm chat-profile-input" id="profile-notes" name="notes" rows="3" maxlength="5000" placeholder="Add visitor notes" @if((int) auth()->user()->role === 1) readonly @endif></textarea>
+                            @if((int) auth()->user()->role === 2)
+                                <button class="btn btn-sm btn-primary w-100" type="submit" id="profile-save-button">Save details</button>
+                            @endif
+                            <div class="small mt-2" id="profile-save-status" role="status"></div>
+                        </form>
+                    </div>
+                </aside>
                 <!-- /Sidebar Right -->
                 <div class="app-overlay"></div>
             </div>
@@ -307,6 +626,37 @@
     });
 
     let activeInput = null;
+    let activeEmojiButton = null;
+
+    function positionEmojiPicker(button) {
+        const panel = document.querySelector('.chat-main-panel');
+        const pickerElement = document.querySelector('.emoji-picker__wrapper');
+        if (!panel || !pickerElement) return;
+
+        const panelBounds = panel.getBoundingClientRect();
+        const buttonBounds = button.getBoundingClientRect();
+        const padding = 12;
+        pickerElement.style.position = 'fixed';
+        pickerElement.style.transform = 'none';
+        pickerElement.style.maxWidth = `${Math.max(0, panelBounds.width - padding * 2)}px`;
+        pickerElement.style.maxHeight = `${Math.max(0, panelBounds.height - padding * 2)}px`;
+        pickerElement.style.overflowY = 'auto';
+        pickerElement.style.zIndex = '1060';
+
+        const pickerBounds = pickerElement.getBoundingClientRect();
+        const maxLeft = Math.max(panelBounds.left + padding, panelBounds.right - pickerBounds.width - padding);
+        const maxTop = Math.max(panelBounds.top + padding, panelBounds.bottom - pickerBounds.height - padding);
+        const left = Math.min(Math.max(buttonBounds.left, panelBounds.left + padding), maxLeft);
+        const top = Math.min(
+            Math.max(buttonBounds.top - pickerBounds.height - padding, panelBounds.top + padding),
+            maxTop
+        );
+
+        pickerElement.style.left = `${left}px`;
+        pickerElement.style.top = `${top}px`;
+        pickerElement.style.right = 'auto';
+        pickerElement.style.bottom = 'auto';
+    }
 
     // 🔹 When emoji selected
     picker.on('emoji', selection => {
@@ -341,7 +691,13 @@
         activeInput = form.querySelector('.message-input');
         if (!activeInput) return;
 
+        activeEmojiButton = btn;
         picker.togglePicker(btn);
+        requestAnimationFrame(() => positionEmojiPicker(btn));
+    });
+
+    window.addEventListener('resize', () => {
+        if (activeEmojiButton) positionEmojiPicker(activeEmojiButton);
     });
 </script>
 <script>
@@ -376,6 +732,14 @@ const currentUserId = {{ auth()->id() }};
 let currentPage = 1;
 let lastPage = null;
 let lastMessageId = null;
+const openChatTabs = new Map();
+const boundChatChannels = new Set();
+let activeChatRequest = 0;
+let messageRequestId = 0;
+let currentInboxChatId = null;
+let profileRequestId = 0;
+const profileRoute = "{{ route('admin.chat.profile', ':id') }}";
+const profileUpdateRoute = "{{ route('admin.chat.profile.update', ':id') }}";
 
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -423,19 +787,14 @@ document.addEventListener('DOMContentLoaded', function () {
 // ================= Active chat messages =================
 
 function subscribeToChat(chatId) {
-    if (chatChannel?.name === `chat.${chatId}`) return;
-
-    if (chatChannel) {
-        pusherChat.unsubscribe(chatChannel.name);
-    }
-
     chatChannel = pusherChat.subscribe(`chat.${chatId}`);
+    const chatKey = String(chatId);
+    if (boundChatChannels.has(chatKey)) return;
+    boundChatChannels.add(chatKey);
 
     chatChannel.bind('new-message', data => {
-        if (data.role == 3) {
-            notifySound.currentTime = 0;
-            notifySound.play().catch(err => console.error('Sound play failed:', err));
-        }
+        if (String(window.chatId) !== chatKey) return;
+        if (messageAlreadyRendered(data.id)) return;
 
         const isAi = data.is_ai == 1 || data.is_ai === true || data.role == 4;
         const userName = isAi ? 'AI Assistant' : (data.user ? data.user.name : (data.role == 3 ? 'Visitor' : 'Agent'));
@@ -456,7 +815,7 @@ function subscribeToChat(chatId) {
     });
 
     chatChannel.bind('messages-read', data => {
-        if (data.sender_type === 'agent') {
+        if (String(window.chatId) === chatKey && data.sender_type === 'agent') {
             document.querySelectorAll('.message-ticks').forEach(el => {
                 el.innerHTML = '<i class="bx bx-check-double text-primary"></i>';
             });
@@ -464,7 +823,7 @@ function subscribeToChat(chatId) {
     });
 
     chatChannel.bind('typing', data => {
-        if (data.role == 3) { // visitor typing
+        if (String(window.chatId) === chatKey && data.role == 3) {
             const typing = document.getElementById('typing-indicator');
             if (!typing) return;
 
@@ -478,20 +837,27 @@ function subscribeToChat(chatId) {
     });
 
     chatChannel.bind('activity', data => {
-        const ul = document.querySelector('.chat-history');
-        ul.appendChild(renderSystemMessage(data.message));
+        const tab = openChatTabs.get(chatKey);
+        if (data.chat_status === 'closed' && tab) {
+            tab.status = 'closed';
+        }
 
         if (data.chat_status === 'closed') {
-            disableChatForm('Chat closed due to inactivity');
-
-            // 🔁 sidebar dataset update
             const el = document.querySelector(`.chat-user[data-chat-id="${data.chat_id}"]`);
             if (el) el.dataset.chatStatus = 'closed';
         }
+
+        if (String(window.chatId) === chatKey) {
+            const ul = document.querySelector('.chat-history');
+            if (ul) ul.appendChild(renderSystemMessage(data.message));
+            if (data.chat_status === 'closed') {
+                disableChatForm('Chat closed due to inactivity');
+            }
+        }
     });
 
-    // 🤖 AI processing — block/unblock agent send during AI response generation
     chatChannel.bind('ai-processing', data => {
+        if (String(window.chatId) !== chatKey) return;
         if (data.processing) {
             disableChatForm('⏳ AI is generating a response... Please wait.');
         } else {
@@ -499,8 +865,8 @@ function subscribeToChat(chatId) {
         }
     });
 
-    // 🔄 Agent switched — show system message when agent takes over from AI
     chatChannel.bind('agent-switched', data => {
+        if (String(window.chatId) !== chatKey) return;
         const ul = document.querySelector('.chat-history');
         ul.appendChild(renderSystemMessage(data.message));
 
@@ -520,6 +886,7 @@ function getUnreadBadge(chatId) {
 function isChatActive(chatId) {
     return document
         .querySelector(`.chat-user[data-chat-id="${chatId}"]`)
+        ?.closest('.chat-contact-list-item')
         ?.classList.contains('active');
 }
 
@@ -636,26 +1003,37 @@ function renderSystemMessage(text) {
         badgeColor = 'bg-label-secondary';
     }
 
-    // 🔹 URL detection and replacement
-    const urlMatch = text.match(/https?:\/\/[^\s]+/g); // match all URLs
-    let formattedText = text;
-
-    if (urlMatch) {
-        urlMatch.forEach(url => {
-            formattedText = formattedText.replace(
-                url,
-                `<a href="${url}" target="_blank" style="text-decoration: underline; color: #696cff;">Site</a>`
-            );
-        });
+    const content = document.createElement('span');
+    const navigationPrefix = 'Visitor navigated to: ';
+    if (text.startsWith(navigationPrefix)) {
+        content.append(document.createTextNode(navigationPrefix));
+        const visitedUrl = text.slice(navigationPrefix.length);
+        try {
+            const parsedUrl = new URL(visitedUrl);
+            if (['http:', 'https:'].includes(parsedUrl.protocol)) {
+                const link = document.createElement('a');
+                link.href = parsedUrl.toString();
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = visitedUrl;
+                content.appendChild(link);
+            } else {
+                content.appendChild(document.createTextNode(visitedUrl));
+            }
+        } catch {
+            content.appendChild(document.createTextNode(visitedUrl));
+        }
+    } else {
+        content.textContent = text;
     }
 
-    li.innerHTML = `
-        <div class="d-flex justify-content-center my-2">
-            <span class="badge ${badgeColor} px-3 py-1 rounded-pill text-muted">
-                ${formattedText}
-            </span>
-        </div>
-    `;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'd-flex justify-content-center my-2';
+    const badge = document.createElement('span');
+    badge.className = `badge ${badgeColor} px-3 py-1 rounded-pill text-muted`;
+    badge.appendChild(content);
+    wrapper.appendChild(badge);
+    li.appendChild(wrapper);
 
     return li;
 }
@@ -676,6 +1054,12 @@ function appendMessage(text, role, userAvatar = null, created_at = null, is_read
     chatBody.scrollTop = chatBody.scrollHeight;
 }
 
+function messageAlreadyRendered(messageId) {
+    if (messageId == null) return false;
+    return Array.from(document.querySelectorAll('.message-ticks[data-msg-id]'))
+        .some(tick => tick.dataset.msgId === String(messageId));
+}
+
 let limit = 20;
 let offset = 0;
 let loading = false;
@@ -684,15 +1068,23 @@ let allLoaded = false;
 function loadMessages(chatId, prepend = false) {
     if (loading || allLoaded) return;
     loading = true;
+    const requestedChatId = String(chatId);
+    const requestId = ++messageRequestId;
 
     const container = document.querySelector('.chat-history-body');
+    if (!container) {
+        loading = false;
+        return;
+    }
     const ul = container.querySelector('.chat-history');
     const oldScrollHeight = container.scrollHeight;
     const oldScrollTop = container.scrollTop;
 
-    fetch(`{{ route('admin.chat.messages', ':id') }}`.replace(':id', chatId) + `?limit=${limit}&offset=${offset}&prepend=${prepend ? 1 : 0}`)
+    fetch(`{{ route('admin.chat.messages', ':id') }}`.replace(':id', encodeURIComponent(requestedChatId)) + `?limit=${limit}&offset=${offset}&prepend=${prepend ? 1 : 0}`)
         .then(res => res.json())
         .then(data => {
+            if (String(window.chatId) !== requestedChatId) return;
+
             if (!data.count || !data.data.length) {
                 allLoaded = true;
                 return;
@@ -728,7 +1120,9 @@ function loadMessages(chatId, prepend = false) {
             allLoaded = !data.has_more;
         })
         .finally(() => {
-            loading = false;
+            if (requestId === messageRequestId) {
+                loading = false;
+            }
         });
 }
 
@@ -741,7 +1135,7 @@ document.querySelectorAll('.chat-user').forEach(item => {
     item.addEventListener('click', function (e) {
         e.preventDefault();
         updateSidebar(this.dataset);
-        openChat(this.dataset.chatId, this.dataset.chatStatus);
+        activateChatTab(this.dataset.chatId, this.dataset.chatStatus, this.dataset);
     });
 });
 
@@ -821,8 +1215,12 @@ function sendMessage(form, input, message) {
 
     isSending = true;
     input.disabled = true;
+    const sendButton = form.querySelector('.send-msg-btn');
+    const status = form.closest('.chat-history-footer').querySelector('.send-message-status');
+    sendButton.disabled = true;
+    status.textContent = '';
 
-    fetch("{{ route('admin.chat.send') }}", {
+    return fetch("{{ route('admin.chat.send') }}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -834,27 +1232,40 @@ function sendMessage(form, input, message) {
             message: message
         })
     })
-    .then(res => {
-        if (res.status === 423) {
-            // AI is processing — show alert and keep message in input
-            return res.json().then(data => {
-                alert(data.message || 'AI is generating a response. Please wait.');
-                throw new Error('ai_processing');
-            });
+    .then(async res => {
+        const result = await res.json();
+        if (!res.ok) {
+            throw new Error(result.message || result.error || 'Your message could not be sent.');
         }
-        return res.json();
+        return result;
     })
-    .then(() => {
+    .then(result => {
+        if (result.status !== 'sent' || !result.message) {
+            throw new Error('The server did not confirm that your message was sent.');
+        }
+
+        if (String(window.chatId) === String(form.dataset.chatId) && !messageAlreadyRendered(result.message.id)) {
+            appendMessage(
+                result.message.message,
+                result.message.role,
+                result.message.user?.image,
+                result.message.formatted_created_at,
+                result.message.is_read,
+                result.message.id,
+                false,
+                result.message.user?.name
+            );
+        }
         input.value = '';
     })
     .catch(err => {
-        if (err.message !== 'ai_processing') {
-            console.error('Send message error:', err);
-        }
+        console.error('Send message error:', err);
+        status.textContent = err.message || 'Your message could not be sent. Please try again.';
     })
     .finally(() => {
         isSending = false;
         input.disabled = false;
+        sendButton.disabled = false;
         input.focus();
     });
 }
@@ -864,37 +1275,124 @@ document.addEventListener('DOMContentLoaded', function () {
     let urlChatId = params.get('chatId');
 
     if (urlChatId) {
-        openChat(urlChatId);
+        const contact = getChatContact(urlChatId);
+        activateChatTab(urlChatId, contact?.dataset.chatStatus || 'open', contact?.dataset || null);
     }
 });
 
-// Avatar click → sidebar open
-document.querySelector('[data-target="#app-chat-sidebar-right"]').addEventListener('click', function () {
-    document.getElementById('app-chat-sidebar-right').classList.toggle('show');
+window.addEventListener('chat-dock-open', event => {
+    const { chatId: requestedChatId, name } = event.detail || {};
+    if (!requestedChatId) return;
+
+    const contact = getChatContact(requestedChatId);
+    activateChatTab(
+        requestedChatId,
+        contact?.dataset.chatStatus || 'open',
+        contact?.dataset || { name: name || `Visitor-${requestedChatId}` }
+    );
 });
 
-// Close button
-document.querySelector('.close-sidebar').addEventListener('click', function () {
-    document.getElementById('app-chat-sidebar-right').classList.remove('show');
+document.getElementById('current-chat-tab').addEventListener('click', () => {
+    if (!currentInboxChatId) return;
+    const current = openChatTabs.get(String(currentInboxChatId));
+    activateChatTab(currentInboxChatId, current?.status || 'open', current?.contact || null);
 });
 
-function openChat(chatId, chatStatus = 'open') {
+document.getElementById('past-chat-toggle').addEventListener('click', () => {
+    document.getElementById('past-chat-list').classList.toggle('show');
+});
 
-    let getChat = "{{ route('admin.chat.show', ':id') }}".replace(':id', chatId);
+document.addEventListener('click', event => {
+    const navigation = document.getElementById('chat-session-navigation');
+    if (navigation && !navigation.contains(event.target)) {
+        document.getElementById('past-chat-list').classList.remove('show');
+    }
+});
 
+function getChatContact(chatId) {
+    return Array.from(document.querySelectorAll('.chat-user'))
+        .find(contact => String(contact.dataset.chatId) === String(chatId));
+}
+
+function activateChatTab(chatId, chatStatus = 'open', contactData = null) {
+    const id = String(chatId);
+    const contact = contactData || getChatContact(id)?.dataset || {};
+    const name = contact.name || openChatTabs.get(id)?.name || 'Visitor';
+    const isAlreadyVisible = String(window.chatId) === id
+        && document.getElementById('app-chat-history').dataset.chatId === id;
+
+    openChatTabs.set(id, {
+        id,
+        name,
+        status: chatStatus || 'open',
+        contact: { ...contact }
+    });
+    currentInboxChatId = chatStatus === 'closed' ? null : id;
+    document.getElementById('current-chat-tab').disabled = !currentInboxChatId;
+    document.getElementById('chat-session-navigation').classList.add('show');
+    window.dispatchEvent(new CustomEvent('chat-dock-register', {
+        detail: { id, name }
+    }));
+    window.dispatchEvent(new CustomEvent('chat-dock-read', {
+        detail: { chatId: id }
+    }));
+    if (contact.name) {
+        updateSidebar(contact);
+        document.getElementById('profile-visitor-id').value = contact.visitorId || '';
+        document.getElementById('profile-notes').value = '';
+        document.getElementById('profile-save-status').textContent = '';
+        document.getElementById('profile-past-chats').textContent = 'Loading visitor details...';
+        document.getElementById('profile-past-chat-count').textContent = '0';
+        document.getElementById('past-chat-count').textContent = '0';
+        document.getElementById('past-chat-list').replaceChildren();
+        document.getElementById('profile-session-duration').textContent = '-';
+        document.getElementById('profile-session-started').textContent = '-';
+        const pathLink = document.getElementById('profile-visitor-path');
+        pathLink.removeAttribute('href');
+        pathLink.textContent = 'Loading visitor details...';
+    }
+    loadVisitorProfile(id);
+    window.chatId = id;
+    chatId = id;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('chatId', id);
+    window.history.replaceState({}, '', url);
+
+    document.querySelectorAll('.chat-user').forEach(item => {
+        item.closest('.chat-contact-list-item')?.classList.remove('active');
+    });
+    getChatContact(id)?.closest('.chat-contact-list-item')?.classList.add('active');
+    document.getElementById('app-chat-conversation').classList.add('d-none');
+
+    if (isAlreadyVisible) return;
+
+    const requestId = ++activeChatRequest;
+    messageRequestId++;
+    loading = false;
+    allLoaded = false;
+    offset = 0;
+    const history = document.getElementById('app-chat-history');
+    history.dataset.chatId = id;
+    history.classList.add('d-none');
+    history.innerHTML = '';
+
+    const getChat = "{{ route('admin.chat.show', ':id') }}".replace(':id', encodeURIComponent(id));
     fetch(getChat)
-        .then(res => res.text())
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Chat request failed with status ${res.status}.`);
+            }
+            return res.text();
+        })
         .then(html => {
+            if (requestId !== activeChatRequest || String(window.chatId) !== id) return;
 
             const chatHistoryContainer = document.getElementById('app-chat-history');
-            const container = document.querySelector('.chat-history-body');
             chatHistoryContainer.innerHTML = html;
             chatHistoryContainer.classList.remove('d-none');
-            document.getElementById('app-chat-conversation')?.classList.add('d-none');
 
-            // Active highlight
-            document.querySelectorAll('.chat-user').forEach(el => el.classList.remove('active'));
-            document.querySelector(`.chat-user[data-chat-id="${chatId}"]`)?.classList.add('active');
+            const chatBody = chatHistoryContainer.querySelector('.chat-history-body');
 
             const badge = getUnreadBadge(chatId);
             if (badge) {
@@ -902,62 +1400,279 @@ function openChat(chatId, chatStatus = 'open') {
                 badge.style.display = 'none';
             }
 
-            window.chatId = chatId;
-
-            // 🔹 RESET pagination
-            offset = 0;
-            allLoaded = false;
-            loading = false;
-
-            // 🔹 Clear messages
-            const ul = document.querySelector('.chat-history-body .chat-history');
-            ul.innerHTML = '';
-
-            // 🔹 Scroll listener
-            const chatBody = document.querySelector('.chat-history-body');
-            // remove old listener (clone trick)
-            const newChatBody = chatBody.cloneNode(true);
-            chatBody.parentNode.replaceChild(newChatBody, chatBody);
-
-            newChatBody.addEventListener('scroll', () => {
-                if (newChatBody.scrollTop === 0 && !loading && !allLoaded) {
+            chatBody.addEventListener('scroll', () => {
+                if (chatBody.scrollTop === 0 && !loading && !allLoaded) {
                     loadMessages(window.chatId, true);
                 }
             });
 
-            // 🔹 Load messages
-            loadMessages(chatId);
+            loadMessages(id);
+            subscribeToChat(id);
+            markMessagesRead(id);
 
-            // 🔹 Subscribe pusher
-            subscribeToChat(chatId);
-
-            // 🔹 Mark read
-            markMessagesRead(chatId);
-
-            // 🔴 IMPORTANT: disable input if chat closed
-            if (chatStatus === 'closed') {
+            if ((openChatTabs.get(id)?.status || chatStatus) === 'closed') {
                 disableChatForm('Chat closed');
             } else {
                 enableChatForm();
             }
 
             initSidebar();
+        })
+        .catch(error => {
+            if (requestId === activeChatRequest) {
+                console.error('Unable to open chat:', error);
+                const history = document.getElementById('app-chat-history');
+                history.innerHTML = '<div class="d-flex h-100 align-items-center justify-content-center text-muted">Could not load this chat. Please try again.</div>';
+                history.classList.remove('d-none');
+            }
         });
 }
 
-function updateSidebar(data) {
-    document.getElementById('sidebar-avatar').src   = data.avatar;
-    document.getElementById('sidebar-name').innerText  = data.name;
-    document.getElementById('sidebar-role').innerText  = data.role;
-    document.getElementById('sidebar-email').innerText = data.email;
-    document.getElementById('sidebar-phone').innerText = data.phone;
-    document.getElementById('sidebar-ip-address').innerText = data.ipaddress;
-    document.getElementById('sidebar-country').innerText = data.country;
-    document.getElementById('sidebar-city').innerText = data.city;
-    document.getElementById('sidebar-device').innerText = data.device;
-    document.getElementById('sidebar-browser').innerText = data.browser;
-    document.getElementById('sidebar-os').innerText = data.os;
+function closeChatTab(chatId) {
+    const id = String(chatId);
+    openChatTabs.delete(id);
+
+    if (String(window.chatId) === id) {
+        const nextChat = Array.from(openChatTabs.values()).pop();
+        if (nextChat) {
+            activateChatTab(nextChat.id, nextChat.status, nextChat.contact);
+            return;
+        }
+
+        activeChatRequest++;
+        messageRequestId++;
+        window.chatId = null;
+        chatId = null;
+        loading = false;
+        allLoaded = false;
+
+        const history = document.getElementById('app-chat-history');
+        history.classList.add('d-none');
+        history.innerHTML = '';
+        delete history.dataset.chatId;
+        document.getElementById('app-chat-conversation').classList.remove('d-none');
+        document.querySelectorAll('.chat-user').forEach(item => {
+            item.closest('.chat-contact-list-item')?.classList.remove('active');
+        });
+
+        const url = new URL(window.location.href);
+        url.searchParams.delete('chatId');
+        window.history.replaceState({}, '', url);
+    }
+
 }
+
+function updateSidebar(data) {
+    const defaultAvatar = "{{ asset('assets/images/default.png') }}";
+    const avatar = document.getElementById('sidebar-avatar');
+    const flag = document.getElementById('sidebar-avatar-flag');
+    const countryCode = String(data.countryCode || '').toLowerCase();
+    if (/^[a-z]{2}$/.test(countryCode)) {
+        flag.src = `https://flagcdn.com/w40/${countryCode}.png`;
+        flag.alt = `${data.country || 'Visitor country'} flag`;
+        flag.hidden = false;
+        avatar.hidden = true;
+    } else {
+        avatar.src = data.avatar || defaultAvatar;
+        avatar.hidden = false;
+        flag.hidden = true;
+    }
+    document.getElementById('sidebar-name').textContent = data.name || 'Visitor';
+    document.getElementById('sidebar-role').textContent = data.visitorId
+        ? `Visitor #${data.visitorId}`
+        : (data.role || 'Visitor details');
+    if (data.visitorId) {
+        document.getElementById('profile-visitor-id').value = data.visitorId;
+    }
+    document.getElementById('profile-name').value = data.name || '';
+    document.getElementById('profile-email').value = data.email || '';
+    document.getElementById('profile-phone').value = data.phone === '-' ? '' : (data.phone || '');
+    document.getElementById('profile-ip-address').textContent = data.ipaddress || '-';
+    document.getElementById('profile-location').textContent = [data.city, data.country].filter(value => value && value !== '-').join(', ') || '-';
+    document.getElementById('profile-device').textContent = data.device || '-';
+    document.getElementById('profile-browser').textContent = data.browser || '-';
+    document.getElementById('profile-os').textContent = data.os || '-';
+}
+
+function formatSessionDuration(seconds) {
+    const totalMinutes = Math.floor(Math.max(0, Number(seconds) || 0) / 60);
+    if (totalMinutes < 1) return 'Less than 1 min';
+    if (totalMinutes < 60) return `${totalMinutes} min`;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes ? `${hours} hr ${minutes} min` : `${hours} hr`;
+}
+
+function renderPastChats(chats, currentChatId) {
+    const list = document.getElementById('profile-past-chats');
+    const navList = document.getElementById('past-chat-list');
+    list.replaceChildren();
+    navList.replaceChildren();
+    const pastChats = Array.isArray(chats) ? chats : [];
+    document.getElementById('profile-past-chat-count').textContent = String(pastChats.length);
+    document.getElementById('past-chat-count').textContent = String(pastChats.length);
+
+    if (!pastChats.length) {
+        list.textContent = 'No past chats';
+        const empty = document.createElement('div');
+        empty.className = 'p-3 small text-body-secondary';
+        empty.textContent = 'No past chats';
+        navList.appendChild(empty);
+        return;
+    }
+
+    const makePastChatButton = pastChat => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-link text-start text-decoration-none w-100 p-2';
+        button.dataset.chatId = String(pastChat.id);
+        button.dataset.chatStatus = pastChat.status || 'closed';
+        const date = pastChat.date ? new Date(pastChat.date).toLocaleString() : 'Previous conversation';
+        button.textContent = `${date} - ${pastChat.preview || 'No messages'}`;
+        button.addEventListener('click', () => {
+            const current = currentChatId ? openChatTabs.get(String(currentChatId)) : null;
+            if (currentChatId) currentInboxChatId = String(currentChatId);
+            activateChatTab(
+                pastChat.id,
+                pastChat.status || 'closed',
+                current?.contact || (currentChatId ? getChatContact(currentChatId)?.dataset : null) || null
+            );
+            navList.classList.remove('show');
+        });
+        return button;
+    };
+
+    pastChats.forEach(pastChat => {
+        list.appendChild(makePastChatButton(pastChat));
+        navList.appendChild(makePastChatButton(pastChat));
+    });
+}
+
+async function loadVisitorProfile(chatId) {
+    const requestId = ++profileRequestId;
+    const saveStatus = document.getElementById('profile-save-status');
+    saveStatus.textContent = '';
+
+    try {
+        const url = profileRoute.replace(':id', encodeURIComponent(String(chatId)));
+        const response = await fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        });
+        if (!response.ok) throw new Error(`Visitor profile request failed with status ${response.status}.`);
+        const profile = await response.json();
+        if (requestId !== profileRequestId || String(window.chatId) !== String(chatId)) return;
+
+        currentInboxChatId = profile.current_chat?.id ? String(profile.current_chat.id) : null;
+        document.getElementById('current-chat-tab').disabled = !currentInboxChatId;
+        const visitor = profile.visitor;
+        updateSidebar({
+            visitorId: visitor.id,
+            name: visitor.name,
+            email: visitor.email,
+            phone: visitor.phone,
+            avatar: visitor.avatar,
+            countryCode: visitor.country_code,
+            ipaddress: visitor.ip_address,
+            country: visitor.country,
+            city: visitor.city,
+            device: visitor.device,
+            browser: visitor.browser,
+            os: visitor.os,
+            source: visitor.source,
+            keyword: visitor.keyword
+        });
+        document.getElementById('profile-visitor-id').value = visitor.id;
+        document.getElementById('sidebar-role').textContent = `Visitor #${visitor.id}`;
+        document.getElementById('profile-notes').value = visitor.notes || '';
+        const pathLink = document.getElementById('profile-visitor-path');
+        try {
+            if (typeof visitor.last_url !== 'string' || !visitor.last_url.trim()) {
+                throw new Error('No visitor page URL is available.');
+            }
+            const parsedUrl = new URL(visitor.last_url);
+            if (['http:', 'https:'].includes(parsedUrl.protocol)) {
+                pathLink.href = parsedUrl.toString();
+                pathLink.textContent = visitor.last_url;
+            } else {
+                pathLink.removeAttribute('href');
+                pathLink.textContent = 'No page recorded';
+            }
+        } catch {
+            pathLink.removeAttribute('href');
+            pathLink.textContent = 'No page recorded';
+        }
+        document.getElementById('profile-session-duration').textContent = formatSessionDuration(visitor.session_duration_seconds);
+        document.getElementById('profile-session-started').textContent = visitor.session_started_at
+            ? new Date(visitor.session_started_at).toLocaleString()
+            : '-';
+        document.getElementById('profile-source').textContent = visitor.source || 'Direct';
+        document.getElementById('profile-keyword').textContent = visitor.keyword || '-';
+        renderPastChats(profile.past_chats, currentInboxChatId);
+    } catch (error) {
+        if (requestId !== profileRequestId) return;
+        console.error('Unable to load visitor profile:', error);
+        saveStatus.textContent = 'Could not load visitor details.';
+        saveStatus.className = 'small mt-2 text-danger';
+    }
+}
+
+document.getElementById('visitor-profile-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if ({{ (int) auth()->user()->role }} !== 2) return;
+
+    const chatId = String(window.chatId || '');
+    if (!chatId) return;
+
+    const button = document.getElementById('profile-save-button');
+    const status = document.getElementById('profile-save-status');
+    button.disabled = true;
+    status.textContent = 'Saving...';
+    status.className = 'small mt-2 text-body-secondary';
+    try {
+        const response = await fetch(profileUpdateRoute.replace(':id', encodeURIComponent(chatId)), {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                name: document.getElementById('profile-name').value.trim(),
+                email: document.getElementById('profile-email').value.trim() || null,
+                phone: document.getElementById('profile-phone').value.trim() || null,
+                notes: document.getElementById('profile-notes').value
+            })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || Object.values(result.errors || {}).flat().join(' ') || 'Visitor profile could not be saved.');
+        status.textContent = result.message || 'Visitor profile saved.';
+        status.className = 'small mt-2 text-success';
+        document.getElementById('sidebar-name').textContent = document.getElementById('profile-name').value.trim();
+        document.querySelector('#app-chat-history .chat-history-header h6')?.replaceChildren(
+            document.createTextNode(document.getElementById('profile-name').value.trim())
+        );
+        window.dispatchEvent(new CustomEvent('chat-dock-register', {
+            detail: { id: chatId, name: document.getElementById('profile-name').value.trim() }
+        }));
+        const contact = getChatContact(chatId);
+        if (contact) {
+            contact.dataset.name = document.getElementById('profile-name').value.trim();
+            contact.dataset.email = document.getElementById('profile-email').value.trim();
+            contact.dataset.phone = document.getElementById('profile-phone').value.trim();
+            const name = contact.querySelector('.chat-contact-name');
+            if (name) name.textContent = contact.dataset.name;
+        }
+    } catch (error) {
+        console.error('Unable to save visitor profile:', error);
+        status.textContent = error.message || 'Visitor profile could not be saved.';
+        status.className = 'small mt-2 text-danger';
+    } finally {
+        button.disabled = false;
+    }
+});
 
 function escapeHtml(str) {
     if (!str) return '';

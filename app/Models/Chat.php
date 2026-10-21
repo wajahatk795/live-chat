@@ -12,6 +12,11 @@ class Chat extends Model
 
     protected $casts = [
         'ai_pending_since' => 'datetime',
+        'last_visitor_activity_at' => 'datetime',
+        'last_agent_activity_at' => 'datetime',
+        'warned_at' => 'datetime',
+        'system_message_at' => 'datetime',
+        'closed_at' => 'datetime',
     ];
 
     public function messages()

@@ -116,11 +116,7 @@ class BrandController extends Controller
     public function install($id)
     {
         $brand = Brand::findOrFail($id);
-
-        $url = config('app.script_url');
-        $script = '<!--Start of Live Chat -->
-<script src="' . $url . '?brand=' . $brand->id . '&token=' . $brand->verify_token . '"></script>
-<!-- End of Live Chat -->';
+        $script = $this->installScript($brand);
 
         return view('admin.brand.install', compact('brand', 'script'));
     }
@@ -189,15 +185,24 @@ class BrandController extends Controller
             ->toArray();
 
         $chatSettings = ChatSetting::where('brand_id', $brand->id)->first();
-        $widget = env('WIDGET');
+        $script = $this->installScript($brand);
 
         return view('admin.brand.edit', compact(
             'brand',
             'users',
             'selectedUserIds',
             'chatSettings',
-            'widget'
+            'script'
         ));
+    }
+
+    private function installScript(Brand $brand): string
+    {
+        $scriptUrl = rtrim(config('app.url'), '/') . '/widget/widget.js';
+
+        return '<!--Start of Live Chat -->
+    <script src="' . $scriptUrl . '?brand=' . $brand->id . '"></script>
+    <!-- End of Live Chat -->';
     }
 
 
