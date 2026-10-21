@@ -130,8 +130,9 @@ class VisitorController extends Controller
         $chat->update(['last_visitor_activity_at' => now()]);
 
 
-        $roleId = optional($visitor->user)->role;
-        $userId = optional($visitor->user)->id;
+        $visitorUser = $visitor->user;
+        $roleId = optional($visitorUser)->role;
+        $userId = optional($visitorUser)->id;
 
         $msg = Message::create([
             'chat_id' => $chat->id,
@@ -152,6 +153,14 @@ class VisitorController extends Controller
                 'sender' => $userId,
                 'sender_type' => 'visitor',
                 'role' => 3,
+                'country_code' => $visitor->country_code,
+                'user' => [
+                    'id' => $userId,
+                    'name' => $visitorUser->name ?? 'Visitor',
+                    'image' => $visitorUser->image ?? null,
+                    'role' => 3,
+                    'country_code' => $visitor->country_code,
+                ],
                 'created_at' => $msg->formatted_created_at,
                 'formatted_created_at' => $msg->formatted_created_at,
                 'id' => $msg->id,

@@ -91,12 +91,17 @@ test('both visitor widgets use the copied script URL as their API base URL', () 
 test('visitor profile avatars use country flags when a country code exists', () => {
     const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
     const messagesView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat', 'messages.blade.php'), 'utf8');
+    const layoutView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'layout', 'app.blade.php'), 'utf8');
 
     assert.match(chatView, /data-country-code="{{ \$chat->main_visitor->country_code/);
     assert.match(chatView, /https:\/\/flagcdn\.com\/w40\/\{\{ strtolower\(\$chat->main_visitor->country_code\) \}\}\.png/);
     assert.match(chatView, /id="sidebar-avatar-flag"/);
     assert.match(chatView, /flag\.src = `https:\/\/flagcdn\.com\/w40\/\$\{countryCode\}\.png`/);
+    assert.match(chatView, /function renderMessage\([\s\S]*?countryCode = null\)/);
+    assert.match(chatView, /https:\/\/flagcdn\.com\/w40\/\$\{countryCode\}\.png/);
+    assert.match(chatView, /msg\.user\?\.country_code/);
     assert.match(messagesView, /https:\/\/flagcdn\.com\/w40\/\{\{ strtolower\(\$chat->main_visitor->country_code\) \}\}\.png/);
+    assert.match(layoutView, /message\.user\?\.country_code/);
 });
 
 test('agent chat composer only shows saved shortcuts for slash suggestions', () => {

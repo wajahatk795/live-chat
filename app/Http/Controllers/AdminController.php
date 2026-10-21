@@ -312,7 +312,7 @@ class AdminController extends Controller
         $offset = $request->get('offset', 0);
         $prepend = $request->get('prepend', 0); // 1 if load more
 
-        $chat = Chat::with('visitor')->find($chatId);
+        $chat = Chat::with(['visitor', 'main_visitor'])->find($chatId);
 
         // Fetch messages
         $messages = Message::with('user')
@@ -321,6 +321,12 @@ class AdminController extends Controller
             ->skip($offset)
             ->take($limit)
             ->get();
+
+        $messages->each(function (Message $message) use ($chat) {
+            if ($message->user && (int) $message->user->role === 3) {
+                $message->user->setAttribute('country_code', $chat?->main_visitor?->country_code);
+            }
+        });
 
         // Conditionally reverse
         if (!$prepend) {

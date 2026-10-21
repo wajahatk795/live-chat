@@ -360,6 +360,45 @@ class ChatHistoryTest extends TestCase
             ->assertJsonPath('visitor.country_code', 'US');
     }
 
+    public function test_chat_message_history_includes_visitor_country_code_for_message_avatars(): void
+    {
+        $brand = Brand::create(['name' => 'Message flag brand', 'status' => 1]);
+        $visitor = Visitor::create([
+            'brand_id' => $brand->id,
+            'session_id' => 'message-flag-visitor',
+            'country' => 'United States',
+        ]);
+        $visitorUser = User::create([
+            'name' => 'Visitor',
+            'email' => 'message-flag-visitor@example.com',
+            'password' => 'password',
+            'role' => 3,
+            'visitor_id' => $visitor->id,
+        ]);
+        $agent = User::create([
+            'name' => 'Message flag agent',
+            'email' => 'message-flag-agent@example.com',
+            'password' => 'password',
+            'role' => 2,
+        ]);
+        $chat = Chat::create([
+            'visitor_id' => $visitor->id,
+            'brand_id' => $brand->id,
+            'agent_id' => $agent->id,
+            'status' => 'open',
+        ]);
+        Message::create([
+            'chat_id' => $chat->id,
+            'sender' => $visitorUser->id,
+            'message' => 'Hello from the visitor',
+        ]);
+
+        $this->actingAs($agent)
+            ->getJson(route('admin.chat.messages', $chat->id, false))
+            ->assertOk()
+            ->assertJsonPath('data.0.user.country_code', 'US');
+    }
+
     public function test_updating_visible_profile_fields_preserves_address_and_tags(): void
     {
         $brand = Brand::create(['name' => 'Test brand', 'status' => 1]);

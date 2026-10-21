@@ -799,7 +799,7 @@ function subscribeToChat(chatId) {
         const isAi = data.is_ai == 1 || data.is_ai === true || data.role == 4;
         const userName = isAi ? 'AI Assistant' : (data.user ? data.user.name : (data.role == 3 ? 'Visitor' : 'Agent'));
 
-        appendMessage(data.message, data.role, data.user?.image, data.formatted_created_at, data.is_read, data.id, isAi, userName);
+        appendMessage(data.message, data.role, data.user?.image, data.formatted_created_at, data.is_read, data.id, isAi, userName, data.user?.country_code || data.country_code);
 
         setTimeout(() => {
             const chatBody = document.querySelector('.chat-history-body');
@@ -928,7 +928,7 @@ function markMessagesRead(chatId) {
 
 let readTimeout = null;
 
-function renderMessage(text, role, userAvatar = null, created_at = null, is_read = false, msgId = null, is_ai = false, userName = null) {
+function renderMessage(text, role, userAvatar = null, created_at = null, is_read = false, msgId = null, is_ai = false, userName = null, countryCode = null) {
     const li = document.createElement('li');
 
     li.className = role != 3
@@ -936,7 +936,10 @@ function renderMessage(text, role, userAvatar = null, created_at = null, is_read
         : 'chat-message';
 
     const defaultAvatar = "{{ asset('assets/images/default.png') }}";
-    const avatar = userAvatar || defaultAvatar;
+    countryCode = String(countryCode || '').toLowerCase();
+    const avatar = role == 3 && /^[a-z]{2}$/.test(countryCode)
+        ? `https://flagcdn.com/w40/${countryCode}.png`
+        : userAvatar || defaultAvatar;
 
     let senderBadge = '';
     if (is_ai || role == 4) {
@@ -1105,7 +1108,7 @@ function loadMessages(chatId, prepend = false) {
                 const userName = isAi ? 'AI Assistant' : (msg.user ? msg.user.name : 'Agent');
                 const avatar = msg.user ? msg.user.image : null;
 
-                const li = renderMessage(msg.message, role, avatar, msg.formatted_created_at, msg.is_read, msg.id, isAi, userName);
+                const li = renderMessage(msg.message, role, avatar, msg.formatted_created_at, msg.is_read, msg.id, isAi, userName, msg.user?.country_code);
                 prepend ? ul.prepend(li) : ul.appendChild(li);
             });
 

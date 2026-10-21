@@ -767,9 +767,14 @@
                 const text = document.createElement('li');
                 text.className = role === 3 ? 'chat-message' : 'chat-message chat-message-right';
                 text.dataset.messageId = message.id || '';
-                const avatar = message.user?.image
-                    ? new URL(String(message.user.image).replace(/^\/+/, ''), `${window.location.origin}/`).toString()
-                    : @json(asset('assets/images/default.png'));
+                const countryCode = role === 3
+                    ? String(message.user?.country_code || message.country_code || '').toLowerCase()
+                    : '';
+                const avatar = /^[a-z]{2}$/.test(countryCode)
+                    ? `https://flagcdn.com/w40/${countryCode}.png`
+                    : (message.user?.image
+                        ? new URL(String(message.user.image).replace(/^\/+/, ''), `${window.location.origin}/`).toString()
+                        : @json(asset('assets/images/default.png')));
                 const senderName = message.is_ai ? 'AI Assistant' : (message.user?.name || (role === 3 ? 'Visitor' : 'Agent'));
                 const bubble = document.createElement('div');
                 bubble.className = 'chat-message-wrapper flex-grow-1';
