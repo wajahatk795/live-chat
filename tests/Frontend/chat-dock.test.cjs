@@ -217,10 +217,13 @@ test('country flag images have a visible fallback when their image request fails
     const context = {
         document: {
             createElement(tagName) {
-                assert.equal(tagName, 'span');
+                assert.equal(tagName, 'img');
                 return {
+                    tagName: 'IMG',
                     className: '',
                     textContent: '',
+                    src: '',
+                    alt: '',
                     setAttribute(name, value) {
                         this[name] = value;
                     }
@@ -231,8 +234,10 @@ test('country flag images have a visible fallback when their image request fails
 
     vm.runInNewContext(`${chatView.slice(start, end)}showCountryFlagFallback(image);`, { ...context, image });
 
-    assert.equal(fallbackElement.textContent, '🇵🇰');
-    assert.equal(fallbackElement['aria-label'], 'Pakistan flag');
+    assert.equal(fallbackElement.tagName, 'IMG');
+    assert.equal(fallbackElement.src, 'https://cdn.jsdelivr.net/gh/hampusborgos/country-flags@main/svg/pk.svg');
+    assert.equal(fallbackElement.alt, 'Pakistan flag');
+    assert.equal(typeof fallbackElement.onerror, 'function');
     assert.equal(image.hidden, true);
 });
 

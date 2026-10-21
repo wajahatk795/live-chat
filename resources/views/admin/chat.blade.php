@@ -125,8 +125,9 @@
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
-        font-size: 1.55rem;
-        line-height: 1;
+            width: 32px;
+            height: 32px;
+            object-fit: cover;
     }
 
     .chat-session-navigation {
@@ -1513,13 +1514,16 @@ function showCountryFlagFallback(image) {
         return;
     }
 
-    const fallback = document.createElement('span');
-    fallback.className = `${image.className} visitor-country-flag-fallback`;
-    fallback.textContent = Array.from(countryCode, letter =>
-        String.fromCodePoint(127397 + letter.charCodeAt(0))
-    ).join('');
-    fallback.setAttribute('role', 'img');
-    fallback.setAttribute('aria-label', image.alt || `${countryCode} flag`);
+    const fallback = document.createElement('img');
+    fallback.className = 'rounded-circle visitor-country-flag-fallback';
+    fallback.alt = image.alt || `${countryCode} flag`;
+    fallback.width = 32;
+    fallback.height = 32;
+    fallback.onerror = () => {
+        fallback.onerror = null;
+        fallback.src = `https://flagcdn.com/48x36/${countryCode.toLowerCase()}.png`;
+    };
+    fallback.src = `https://cdn.jsdelivr.net/gh/hampusborgos/country-flags@main/svg/${countryCode.toLowerCase()}.svg`;
     image.hidden = true;
     image.insertAdjacentElement('afterend', fallback);
     image.countryFlagFallback = fallback;
