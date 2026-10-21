@@ -15,9 +15,17 @@ class DashboardService
     public function getWeeklyChartData(string $column = 'created_at'): array
     {
         $startOfWeek = Carbon::now()->startOfWeek();
+        $endOfWeek   = Carbon::now()->endOfWeek();
 
-        return collect(range(0, 6))->map(function ($i) use ($startOfWeek, $column) {
-            return User::whereDate($column, $startOfWeek->copy()->addDays($i))->count();
+        $countsByDay = User::whereBetween($column, [$startOfWeek, $endOfWeek])
+            ->selectRaw("DATE($column) as date_val, COUNT(*) as count")
+            ->groupBy('date_val')
+            ->pluck('count', 'date_val')
+            ->toArray();
+
+        return collect(range(0, 6))->map(function ($i) use ($startOfWeek, $countsByDay) {
+            $dayDate = $startOfWeek->copy()->addDays($i)->format('Y-m-d');
+            return (int) ($countsByDay[$dayDate] ?? 0);
         })->toArray();
     }
 

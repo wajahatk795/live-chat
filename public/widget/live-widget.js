@@ -475,6 +475,10 @@
             msgId = null,
             isRead = false,
         ) {
+            if (msgId && messages.querySelector(`[data-msg-id="${msgId}"]`)) {
+                return;
+            }
+
             const div = document.createElement("div");
             div.style.margin = "8px 0";
             div.style.textAlign = from == 3 ? "right" : "left";
@@ -594,30 +598,35 @@
 
         /* ================= SEND ================= */
 
+        let isVisitorTyping = false;
+        let visitorTypingTimer = null;
+
         input.addEventListener("keydown", (e) => {
             // 🚫 Prevent typing if brand invalid
             if (!isBrandValid) return;
 
-            let typingTimer = null;
-            clearTimeout(typingTimer);
-
-            fetch(`${BASE_URL}/api/visitor-typing`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    session_id: SESSION_ID,
-                    chat_id: window.CHAT_ID,
-                }),
-            });
-
-            typingTimer = setTimeout(() => {
-                // optional: stop typing
-            }, 1500);
-
             if (e.key === "Enter") {
                 e.preventDefault();
                 sendMessage();
+                return;
             }
+
+            if (!isVisitorTyping && window.CHAT_ID) {
+                isVisitorTyping = true;
+                fetch(`${BASE_URL}/api/visitor-typing`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: SESSION_ID,
+                        chat_id: window.CHAT_ID,
+                    }),
+                }).catch(() => {});
+            }
+
+            clearTimeout(visitorTypingTimer);
+            visitorTypingTimer = setTimeout(() => {
+                isVisitorTyping = false;
+            }, 2500);
         });
 
         /* ================== INITIALIZE send btn ================== */
@@ -632,7 +641,8 @@
                 return;
             }
 
-            if (!input.value.trim()) return;
+            const messageText = input.value.trim();
+            if (!messageText) return;
 
             // Clear any proactive greeting timer
             clearTimeout(proactiveGreetTimer);
@@ -653,17 +663,31 @@
                 }, delayMs);
             }
 
+            // ⚡ Instant optimistic rendering: Visitor sees their message immediately with 0 delay!
+            const optimisticId = "temp-" + Date.now();
+            addMsg(
+                messageText,
+                3,
+                "Just now",
+                true,
+                false,
+                optimisticId,
+                false
+            );
+
+            input.value = "";
+
             fetch(API_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    message: input.value,
+                    message: messageText,
                     session_id: SESSION_ID,
                     chat_id: window.CHAT_ID,
                 }),
+            }).catch((err) => {
+                console.error("Message send error:", err);
             });
-
-            input.value = "";
         }
 
         sendBtn.addEventListener("click", sendMessage);
@@ -878,6 +902,22 @@
                                 box.style.display = "flex";
                                 notifySound.play().catch(() => {});
                                 scrollToBottom();
+                            }
+
+                            if (data.role == 3) {
+                                const pendingEl = messages.querySelector('[data-msg-id^="temp-"]');
+                                if (pendingEl) {
+                                    pendingEl.dataset.msgId = data.id || "";
+                                    const ticks = pendingEl.querySelector(".widget-message-ticks");
+                                    if (ticks) {
+                                        ticks.dataset.msgId = data.id || "";
+                                        ticks.innerHTML = data.is_read ? '<span style="color:#42a5f5;">✔✔</span>' : '<span style="color:#bbb;">✔</span>';
+                                    }
+                                    return;
+                                }
+                                if (data.id && messages.querySelector(`[data-msg-id="${data.id}"]`)) {
+                                    return;
+                                }
                             }
 
                             addMsg(

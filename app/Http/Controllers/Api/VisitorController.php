@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Mail;
 use Jenssegers\Agent\Agent;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 
 class VisitorController extends Controller
 {
@@ -143,50 +144,51 @@ class VisitorController extends Controller
         $brand = $chat->get_brand ?: ($chat->brand ?: Brand::find($chat->brand_id));
         $brandUserIds = $brand ? $brand->users->pluck('id')->all() : [];
 
-        emit_pusher_notification(
-            'chat.' . $chat->id, // channel
-            'new-message',                // event
+        emit_pusher_batch([
             [
-                'chat_id' => $chat->id,
-                'user_id' => $userId,
-                'message' => $request->message,
-                'sender' => $userId,
-                'sender_type' => 'visitor',
-                'role' => 3,
-                'country_code' => $visitor->country_code,
-                'user' => [
-                    'id' => $userId,
-                    'name' => $visitorUser->name ?? 'Visitor',
-                    'image' => $visitorUser->image ?? null,
-                    'role' => 3,
-                    'country_code' => $visitor->country_code,
-                ],
-                'created_at' => $msg->formatted_created_at,
-                'formatted_created_at' => $msg->formatted_created_at,
-                'id' => $msg->id,
-                'is_read' => false
-            ]
-        );
-
-        emit_pusher_notification(
-            'admin-notifications',
-            'visitor-message',
-            [
-                'chat' => [
-                    'id' => $chat->id,
-                ],
-                'visitor' => [
-                    'id' => $visitor->id,
-                    'country_code' => $visitor->country_code,
-                ],
-                'message' => [
-                    'id' => $msg->id,
-                    'message' => $request->message,
+                'channel' => 'chat.' . $chat->id,
+                'name'    => 'new-message',
+                'data'    => [
+                    'chat_id'              => $chat->id,
+                    'user_id'              => $userId,
+                    'message'              => $request->message,
+                    'sender'               => $userId,
+                    'sender_type'          => 'visitor',
+                    'role'                 => 3,
+                    'country_code'         => $visitor->country_code,
+                    'user'                 => [
+                        'id'           => $userId,
+                        'name'         => $visitorUser->name ?? 'Visitor',
+                        'image'        => $visitorUser->image ?? null,
+                        'role'         => 3,
+                        'country_code' => $visitor->country_code,
+                    ],
+                    'created_at'           => $msg->formatted_created_at,
                     'formatted_created_at' => $msg->formatted_created_at,
-                ],
-                'user_ids' => $brandUserIds,
+                    'id'                   => $msg->id,
+                    'is_read'              => false,
+                ]
+            ],
+            [
+                'channel' => 'admin-notifications',
+                'name'    => 'visitor-message',
+                'data'    => [
+                    'chat'     => [
+                        'id' => $chat->id,
+                    ],
+                    'visitor'  => [
+                        'id'           => $visitor->id,
+                        'country_code' => $visitor->country_code,
+                    ],
+                    'message'  => [
+                        'id'                   => $msg->id,
+                        'message'              => $request->message,
+                        'formatted_created_at' => $msg->formatted_created_at,
+                    ],
+                    'user_ids' => $brandUserIds,
+                ]
             ]
-        );
+        ]);
 
         // Check if AI is enabled for this brand and set up delayed AI handoff
         $settings = $brand ? ($brand->chatSetting ?: \App\Models\ChatSetting::where('brand_id', $brand->id)->first()) : null;
@@ -271,14 +273,22 @@ class VisitorController extends Controller
         $browser = $agent->browser();
         $os = $agent->platform();
 
-        // 🔹 Location using IP API
-        $location = Http::get("http://ip-api.com/json/{$ip}")->json();
-        if (
-            app()->environment('local')
-            && in_array($ip, ['127.0.0.1', '::1'], true)
-            && (($location['status'] ?? null) !== 'success' || empty($location['countryCode']))
-        ) {
-            $location = Http::get('http://ip-api.com/json/')->json();
+        // 🔹 Location using IP API (Cached to eliminate slow blocking external HTTP calls on every page view)
+        $location = null;
+        if ($ip) {
+            $cacheKey = 'ip_loc_' . md5($ip);
+            $location = Cache::remember($cacheKey, 86400, function () use ($ip) {
+                try {
+                    if (app()->environment('local') && in_array($ip, ['127.0.0.1', '::1'], true)) {
+                        $res = Http::timeout(1.5)->get('http://ip-api.com/json/');
+                    } else {
+                        $res = Http::timeout(1.5)->get("http://ip-api.com/json/{$ip}");
+                    }
+                    return $res->json() ?: [];
+                } catch (\Throwable $e) {
+                    return [];
+                }
+            });
         }
 
         $country = $location['country'] ?? null;
