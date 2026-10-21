@@ -93,6 +93,7 @@ class MessageController extends Controller
             'created_at' => $msg->created_at,
             'id' => $msg->id,
             'is_read' => (bool) $msg->is_read,
+            'sender_name' => auth()->user()->name ?? 'Support Agent',
             'user' => [
                 'id' => auth()->id(),
                 'image' => auth()->user()->image ?? null,

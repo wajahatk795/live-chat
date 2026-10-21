@@ -110,16 +110,24 @@ test('chat inbox has separate online and offline history views with recurring vi
     const contactsView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat', '_contacts.blade.php'), 'utf8');
     const sidebarView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'layout', 'sidebar.blade.php'), 'utf8');
     const controller = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'Http', 'Controllers', 'AdminController.php'), 'utf8');
+    const visitorController = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'Http', 'Controllers', 'Api', 'VisitorController.php'), 'utf8');
+    const visitorModel = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'Models', 'Visitor.php'), 'utf8');
     const widget = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'widget', 'widget.js'), 'utf8');
     const liveWidget = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'widget', 'live-widget.js'), 'utf8');
 
     assert.match(controller, /historyView = request\(\)->query\('view'\) === 'history'/);
-    assert.match(controller, /now\(\)->subMinutes\(3\)/);
+    assert.match(visitorModel, /ONLINE_TIMEOUT_SECONDS = 10/);
+    assert.match(controller, /now\(\)->subSeconds\(Visitor::ONLINE_TIMEOUT_SECONDS\)/);
+    assert.match(visitorController, /now\(\)->subSeconds\(Visitor::ONLINE_TIMEOUT_SECONDS\)/);
+    assert.match(contactsView, /now\(\)->subSeconds\(\\App\\Models\\Visitor::ONLINE_TIMEOUT_SECONDS\)/);
     assert.match(contactsView, /No offline visitors found/);
-    assert.match(chatView, /setInterval\(refreshChatContacts, 30000\)/);
+    assert.match(chatView, /setInterval\(refreshChatContacts, 10000\)/);
+    assert.match(chatView, /\.zendesk-chat-layout:not\(\.has-active-chat\)[\s\S]*?display:\s*none\s*!important/);
+    assert.match(chatView, /zendesk-chat-layout'\)\.classList\.add\('has-active-chat'\)/);
+    assert.match(chatView, /zendesk-chat-layout'\)\.classList\.remove\('has-active-chat'\)/);
     assert.match(sidebarView, /route\('admin\.chat', \['view' => 'history'\]\)/);
-    assert.match(widget, /setInterval\(sendHeartbeat, 30000\)/);
-    assert.match(liveWidget, /setInterval\(sendHeartbeat, 30000\)/);
+    assert.match(widget, /setInterval\(sendHeartbeat, 5000\)/);
+    assert.match(liveWidget, /setInterval\(sendHeartbeat, 5000\)/);
 });
 
 test('live visitor presence events refresh the chat list without a page reload', () => {
@@ -129,6 +137,103 @@ test('live visitor presence events refresh the chat list without a page reload',
     assert.match(visitorController, /'visitor-online'/);
     assert.match(chatView, /bind\('visitor-online'/);
     assert.match(chatView, /refreshChatContacts\(\)/);
+});
+
+test('incoming Pusher visitor messages render immediately in the selected conversation', () => {
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const start = chatView.indexOf('function subscribeToChat(chatId) {');
+    const end = chatView.indexOf('\nfunction getUnreadBadge', start);
+    assert.notEqual(start, -1, 'selected chat must subscribe to message events');
+    assert.notEqual(end, -1, 'chat subscription must precede badge helpers');
+
+    const handlers = new Map();
+    const appendedMessages = [];
+    const context = {
+        pusherChat: {
+            subscribe: () => ({
+                bind: (eventName, handler) => handlers.set(eventName, handler)
+            })
+        },
+        boundChatChannels: new Set(),
+        window: { chatId: '42' },
+        messageAlreadyRendered: () => false,
+        appendMessage: (...args) => appendedMessages.push(args),
+        getUnreadBadge: () => null,
+        document: {
+            querySelector: () => ({ scrollTop: 100, scrollHeight: 100 })
+        },
+        setTimeout: callback => callback(),
+        String
+    };
+
+    vm.runInNewContext(`${chatView.slice(start, end)}subscribeToChat('42');`, context);
+    handlers.get('new-message')({
+        id: 81,
+        message: 'Visitor message',
+        role: 3,
+        country_code: 'PK',
+        user: { id: 9, name: 'Visitor', country_code: 'PK' }
+    });
+
+    assert.equal(appendedMessages.length, 1);
+    assert.equal(appendedMessages[0][0], 'Visitor message');
+    assert.equal(appendedMessages[0][5], 81);
+    assert.equal(appendedMessages[0][8], 'PK');
+});
+
+test('visitor profile sidebar remains hidden until a chat is selected', () => {
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+
+    assert.match(chatView, /\.zendesk-chat-layout:not\(\.has-active-chat\) > \.row > \.app-chat-sidebar-right\s*\{\s*display:\s*none\s*!important;/);
+    assert.match(chatView, /function activateChatTab\([\s\S]*?document\.querySelector\('\.zendesk-chat-layout'\)\.classList\.add\('has-active-chat'\)/);
+    assert.match(chatView, /function closeChatTab\([\s\S]*?document\.querySelector\('\.zendesk-chat-layout'\)\.classList\.remove\('has-active-chat'\)/);
+});
+
+test('country flag images have a visible fallback when their image request fails', () => {
+    const chatView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat.blade.php'), 'utf8');
+    const contactsView = fs.readFileSync(path.join(__dirname, '..', '..', 'resources', 'views', 'admin', 'chat', '_contacts.blade.php'), 'utf8');
+    const start = chatView.indexOf('function showCountryFlagFallback(image) {');
+    const end = chatView.indexOf('\nfunction updateSidebar', start);
+    assert.notEqual(start, -1, 'country flag image fallback must exist');
+    assert.notEqual(end, -1, 'country flag fallback must precede visitor profile updates');
+    assert.match(contactsView, /class="rounded-circle visitor-country-flag"\s+data-country-code=/);
+    assert.match(contactsView, /class="rounded-circle visitor-avatar-image"/);
+    assert.match(chatView, /bindCountryFlagFallbacks\(refreshedList\)/);
+    assert.match(chatView, /bindVisitorAvatarFallbacks\(refreshedList\)/);
+    assert.match(chatView, /flag\.dataset\.countryCode = countryCode/);
+    assert.match(chatView, /flag\.dataset\.fallbackBoundSrc = '';\s*flag\.src = `https:\/\/flagcdn\.com\/w40\/\$\{countryCode\}\.png`/);
+    assert.match(chatView, /image\.onerror = \(\) => \{\s*image\.onerror = null;\s*image\.src = "\{\{ asset\('assets\/images\/default\.png'\) \}\}";/);
+
+    let fallbackElement = null;
+    const image = {
+        dataset: { countryCode: 'pk' },
+        className: 'rounded-circle visitor-country-flag',
+        alt: 'Pakistan flag',
+        insertAdjacentElement(position, element) {
+            assert.equal(position, 'afterend');
+            fallbackElement = element;
+        }
+    };
+    const context = {
+        document: {
+            createElement(tagName) {
+                assert.equal(tagName, 'span');
+                return {
+                    className: '',
+                    textContent: '',
+                    setAttribute(name, value) {
+                        this[name] = value;
+                    }
+                };
+            }
+        }
+    };
+
+    vm.runInNewContext(`${chatView.slice(start, end)}showCountryFlagFallback(image);`, { ...context, image });
+
+    assert.equal(fallbackElement.textContent, '🇵🇰');
+    assert.equal(fallbackElement['aria-label'], 'Pakistan flag');
+    assert.equal(image.hidden, true);
 });
 
 test('visitor notifications render country flags when the visitor country code is available', () => {
@@ -387,7 +492,9 @@ test('past chat count is based on all one-week-old conversations and flags flow 
 
     assert.match(controller, /'past_chats' => \$pastChats/);
     assert.match(chatView, /document\.getElementById\('past-chat-count'\)\.textContent = String\(pastChats\.length\)/);
-    assert.match(chatView, /const avatar = role == 3 && \/\^\[a-z\]\{2\}\$\/\.test\(countryCode\)/);
+    assert.match(chatView, /const hasCountryFlag = role == 3 && \/\^\[a-z\]\{2\}\$\/\.test\(countryCode\)/);
+    assert.match(controller, /withCount\(\['messages as unread_messages_count'/);
+    assert.match(controller, /'last_message_preview' => Message::select\('message'\)[\s\S]*?whereColumn\('chat_id', 'chats\.id'\)[\s\S]*?latest\(\)[\s\S]*?limit\(1\)/);
     assert.match(appView, /avatar\.src = `https:\/\/flagcdn\.com\/w40\/\$\{visitorCountryCode\}\.png`/);
     assert.match(appView, /showChatToast\([\s\S]*?getVisitorCountryCode\(data\)/);
 });

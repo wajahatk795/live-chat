@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Visitor extends Model
 {
+    public const ONLINE_TIMEOUT_SECONDS = 10;
+
     protected $fillable = [
         'brand_id',
         'session_id',

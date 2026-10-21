@@ -9,6 +9,7 @@
                         <img src="https://flagcdn.com/w40/{{ strtolower($chat->main_visitor->country_code) }}.png"
                             alt="{{ $chat->main_visitor->country ?? 'Visitor country' }} flag"
                             class="rounded-circle visitor-country-flag"
+                            data-country-code="{{ strtolower($chat->main_visitor->country_code) }}"
                             data-bs-toggle="sidebar" data-overlay="" data-target="#app-chat-sidebar-right">
                     @else
                         <img src="{{ $user->image ? asset($user->image) : asset('assets/images/default.png')  }}"

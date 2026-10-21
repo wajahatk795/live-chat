@@ -5,13 +5,10 @@
     @forelse ($chats as $chat)
         @php
             $isOnline = $chat->main_visitor?->last_seen_at
-                && $chat->main_visitor->last_seen_at->gte(now()->subMinutes(3));
+                && $chat->main_visitor->last_seen_at->gte(now()->subSeconds(\App\Models\Visitor::ONLINE_TIMEOUT_SECONDS));
             $isPastChat = $chat->isPastConversation(now()->subWeek());
-            $count = $chat->messages()->where('is_read', false)->where('sender', '!=', auth()->id())->count();
-            $lastMessage = $chat->messages()
-                ->whereNotNull('sender')
-                ->latest()
-                ->value('message');
+            $count = $chat->unread_messages_count;
+            $lastMessage = $chat->last_message_preview;
         @endphp
 
         <li class="chat-contact-list-item mb-1 {{ request('chatId') == $chat->id ? 'active' : '' }}">
@@ -39,11 +36,12 @@
                     @if(preg_match('/^[A-Za-z]{2}$/', (string) ($chat->main_visitor->country_code ?? '')))
                         <img src="https://flagcdn.com/w40/{{ strtolower($chat->main_visitor->country_code) }}.png"
                             alt="{{ $chat->main_visitor->country ?? 'Visitor country' }} flag"
-                            class="rounded-circle visitor-country-flag">
+                            class="rounded-circle visitor-country-flag"
+                            data-country-code="{{ strtolower($chat->main_visitor->country_code) }}">
                     @else
                         <img src="{{ $chat->visitor->image ? asset($chat->visitor->image) : asset('assets/images/default.png') }}"
                             alt="Avatar"
-                            class="rounded-circle">
+                            class="rounded-circle visitor-avatar-image">
                     @endif
                 </div>
 

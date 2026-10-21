@@ -121,6 +121,14 @@
         margin: 0 0.25rem 0.25rem 0;
     }
 
+    .visitor-country-flag-fallback {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.55rem;
+        line-height: 1;
+    }
+
     .chat-session-navigation {
         position: relative;
         display: none;
@@ -299,6 +307,18 @@
         }
     }
 
+    .zendesk-chat-layout:not(.has-active-chat) > .row > .app-chat-sidebar-right {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        flex: 0 0 0 !important;
+        border: none !important;
+    }
+    .zendesk-chat-layout:not(.has-active-chat) #app-chat-sidebar-right {
+        display: none !important;
+    }
+
     .chat-system-message {
         justify-content: center !important;
     }
@@ -465,7 +485,7 @@
                     <div class="app-chat-history d-none" id="app-chat-history"></div>
                 </div>
                 <!-- Sidebar Right -->
-                <aside class="col app-chat-sidebar-right app-sidebar overflow-hidden" id="app-chat-sidebar-right">
+                <aside class="col app-chat-sidebar-right app-sidebar overflow-hidden {{ empty($chatId) ? 'd-none' : '' }}" id="app-chat-sidebar-right">
                     <div class="sidebar-header d-flex align-items-center">
                         <div class="avatar avatar-md flex-shrink-0 me-3">
                             <img src="{{ asset('assets/images/default.png') }}" alt="Visitor" class="rounded-circle" id="sidebar-avatar">
@@ -659,6 +679,7 @@ let messageRequestId = 0;
 let currentInboxChatId = null;
 let currentInboxVisitorId = null;
 let profileRequestId = 0;
+let isRefreshingChatContacts = false;
 const profileRoute = "{{ route('admin.chat.profile', ':id') }}";
 const profileUpdateRoute = "{{ route('admin.chat.profile.update', ':id') }}";
 const chatContactsUrl = @json(route('admin.chat.contacts'));
@@ -691,7 +712,7 @@ function subscribeSidebarChat(element) {
 }
 
 async function refreshChatContacts() {
-    if (document.visibilityState === 'hidden') return;
+    if (document.visibilityState === 'hidden' || isRefreshingChatContacts) return;
 
     const currentList = document.getElementById('chat-list');
     if (!currentList) return;
@@ -700,6 +721,7 @@ async function refreshChatContacts() {
     const url = new URL(chatContactsUrl, window.location.origin);
     if (historyView) url.searchParams.set('view', 'history');
 
+    isRefreshingChatContacts = true;
     try {
         const response = await fetch(url, {
             credentials: 'same-origin',
@@ -719,14 +741,26 @@ async function refreshChatContacts() {
 
         currentList.replaceWith(refreshedList);
         refreshedList.querySelectorAll('.chat-user').forEach(subscribeSidebarChat);
+        bindVisitorAvatarFallbacks(refreshedList);
+        bindCountryFlagFallbacks(refreshedList);
     } catch (error) {
         console.error('Unable to refresh visitor list:', error);
+    } finally {
+        isRefreshingChatContacts = false;
     }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
 
     pusherChat.subscribe('admin-notifications').bind('visitor-online', data => {
+        const isAuthorized = currentUserRole === 1
+            || authorizedBrandIds.map(Number).includes(Number(data.brand?.id));
+        if (!isAuthorized) return;
+
+        refreshChatContacts();
+    });
+
+    pusherChat.subscribe('admin-notifications').bind('visitor-offline', data => {
         const isAuthorized = currentUserRole === 1
             || authorizedBrandIds.map(Number).includes(Number(data.brand?.id));
         if (!isAuthorized) return;
@@ -741,7 +775,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Subscribe sidebar chats globally for unread / last message / sound
     document.querySelectorAll('.chat-user').forEach(subscribeSidebarChat);
-    setInterval(refreshChatContacts, 30000);
+    bindVisitorAvatarFallbacks(document);
+    bindCountryFlagFallbacks(document);
+    setInterval(refreshChatContacts, 10000);
 });
 
 // ================= Active chat messages =================
@@ -897,7 +933,8 @@ function renderMessage(text, role, userAvatar = null, created_at = null, is_read
 
     const defaultAvatar = "{{ asset('assets/images/default.png') }}";
     countryCode = String(countryCode || '').toLowerCase();
-    const avatar = role == 3 && /^[a-z]{2}$/.test(countryCode)
+    const hasCountryFlag = role == 3 && /^[a-z]{2}$/.test(countryCode);
+    const avatar = hasCountryFlag
         ? `https://flagcdn.com/w40/${countryCode}.png`
         : userAvatar || defaultAvatar;
 
@@ -919,7 +956,7 @@ function renderMessage(text, role, userAvatar = null, created_at = null, is_read
             ${role == 3 ? `
             <div class="user-avatar flex-shrink-0 me-4">
                 <div class="avatar avatar-sm">
-                    <img src="${avatar}" class="rounded-circle">
+                    <img src="${avatar}" class="rounded-circle${hasCountryFlag ? ' visitor-country-flag' : (role == 3 ? ' visitor-avatar-image' : '')}"${hasCountryFlag ? ` data-country-code="${countryCode}"` : ''}>
                 </div>
             </div>` : ''}
 
@@ -950,6 +987,8 @@ function renderMessage(text, role, userAvatar = null, created_at = null, is_read
         </div>
     `;
 
+    bindVisitorAvatarFallbacks(li);
+    bindCountryFlagFallbacks(li);
     return li;
 }
 
@@ -1001,7 +1040,7 @@ function renderSystemMessage(text) {
     return li;
 }
 
-function appendMessage(text, role, userAvatar = null, created_at = null, is_read = false, msgId = null, is_ai = false, userName = null) {
+function appendMessage(text, role, userAvatar = null, created_at = null, is_read = false, msgId = null, is_ai = false, userName = null, countryCode = null) {
     const ul = document.querySelector('.chat-history');
 
     const noMessage = document.getElementById('no-message');
@@ -1009,7 +1048,7 @@ function appendMessage(text, role, userAvatar = null, created_at = null, is_read
         noMessage.remove();
     }
 
-    const li = renderMessage(text, role, userAvatar, created_at, is_read, msgId, is_ai, userName);
+    const li = renderMessage(text, role, userAvatar, created_at, is_read, msgId, is_ai, userName, countryCode);
     ul.appendChild(li);
 
     // ✅ Scroll chat container to bottom
@@ -1253,6 +1292,9 @@ document.addEventListener('DOMContentLoaded', function () {
             contact?.dataset || null,
             params.get('past') === '1'
         );
+    } else {
+        document.querySelector('.zendesk-chat-layout')?.classList.remove('has-active-chat');
+        document.getElementById('app-chat-sidebar-right')?.classList.add('d-none');
     }
 });
 
@@ -1311,6 +1353,8 @@ function activateChatTab(chatId, chatStatus = 'open', contactData = null, isPast
         currentInboxChatId = chatStatus === 'closed' ? null : id;
     }
     document.getElementById('current-chat-tab').disabled = !currentInboxChatId;
+    document.querySelector('.zendesk-chat-layout').classList.add('has-active-chat');
+    document.getElementById('app-chat-sidebar-right')?.classList.remove('d-none');
     document.getElementById('chat-session-navigation').classList.add('show');
     if (!isPastChat) {
         window.dispatchEvent(new CustomEvent('chat-dock-register', {
@@ -1383,6 +1427,8 @@ function activateChatTab(chatId, chatStatus = 'open', contactData = null, isPast
 
             const chatHistoryContainer = document.getElementById('app-chat-history');
             chatHistoryContainer.innerHTML = html;
+            bindVisitorAvatarFallbacks(chatHistoryContainer);
+            bindCountryFlagFallbacks(chatHistoryContainer);
             chatHistoryContainer.dataset.readOnlyHistory = String(isReadOnlyHistory);
             chatHistoryContainer.classList.remove('d-none');
 
@@ -1447,6 +1493,8 @@ function closeChatTab(chatId) {
         history.innerHTML = '';
         delete history.dataset.chatId;
         document.getElementById('app-chat-conversation').classList.remove('d-none');
+        document.querySelector('.zendesk-chat-layout').classList.remove('has-active-chat');
+        document.getElementById('app-chat-sidebar-right')?.classList.add('d-none');
         document.querySelectorAll('.chat-user').forEach(item => {
             item.closest('.chat-contact-list-item')?.classList.remove('active');
         });
@@ -1458,13 +1506,78 @@ function closeChatTab(chatId) {
 
 }
 
+function showCountryFlagFallback(image) {
+    const countryCode = String(image.dataset.countryCode || '').toUpperCase();
+    if (!/^[A-Z]{2}$/.test(countryCode)) {
+        image.remove();
+        return;
+    }
+
+    const fallback = document.createElement('span');
+    fallback.className = `${image.className} visitor-country-flag-fallback`;
+    fallback.textContent = Array.from(countryCode, letter =>
+        String.fromCodePoint(127397 + letter.charCodeAt(0))
+    ).join('');
+    fallback.setAttribute('role', 'img');
+    fallback.setAttribute('aria-label', image.alt || `${countryCode} flag`);
+    image.hidden = true;
+    image.insertAdjacentElement('afterend', fallback);
+    image.countryFlagFallback = fallback;
+}
+
+function bindCountryFlagFallbacks(root) {
+    const flags = [];
+    if (root.matches?.('img.visitor-country-flag[data-country-code]')) {
+        flags.push(root);
+    }
+    flags.push(...root.querySelectorAll('img.visitor-country-flag[data-country-code]'));
+
+    flags.forEach(image => {
+        if (image.dataset.fallbackBoundSrc === image.src) return;
+        image.countryFlagFallback?.remove();
+        image.countryFlagFallback = null;
+        image.hidden = false;
+        image.dataset.fallbackBoundSrc = image.src;
+        image.onerror = () => showCountryFlagFallback(image);
+        if (image.complete && image.naturalWidth === 0) {
+            showCountryFlagFallback(image);
+        }
+    });
+}
+
+function bindVisitorAvatarFallbacks(root) {
+    const avatarSelector = 'img#sidebar-avatar, .chat-user img.visitor-avatar-image, .chat-history img.visitor-avatar-image';
+    const avatars = [];
+    if (root.matches?.(avatarSelector)) {
+        avatars.push(root);
+    }
+    avatars.push(...root.querySelectorAll(avatarSelector));
+
+    avatars.forEach(image => {
+        if (image.dataset.fallbackBoundSrc === image.src) return;
+        image.dataset.fallbackBoundSrc = image.src;
+        image.onerror = () => {
+            image.onerror = null;
+            image.src = "{{ asset('assets/images/default.png') }}";
+        };
+        if (image.complete && image.naturalWidth === 0) {
+            image.onerror();
+        }
+    });
+}
+
 function updateSidebar(data) {
     const defaultAvatar = "{{ asset('assets/images/default.png') }}";
     const avatar = document.getElementById('sidebar-avatar');
     const flag = document.getElementById('sidebar-avatar-flag');
     const countryCode = String(data.countryCode || '').toLowerCase();
+    flag.countryFlagFallback?.remove();
+    flag.countryFlagFallback = null;
     if (/^[a-z]{2}$/.test(countryCode)) {
+        flag.onerror = null;
+        flag.dataset.fallbackBoundSrc = '';
         flag.src = `https://flagcdn.com/w40/${countryCode}.png`;
+        flag.dataset.countryCode = countryCode;
         flag.alt = `${data.country || 'Visitor country'} flag`;
         flag.hidden = false;
         avatar.hidden = true;
@@ -1473,6 +1586,8 @@ function updateSidebar(data) {
         avatar.hidden = false;
         flag.hidden = true;
     }
+    bindVisitorAvatarFallbacks(avatar.parentElement);
+    bindCountryFlagFallbacks(flag.parentElement);
     document.getElementById('sidebar-name').textContent = data.name || 'Visitor';
     document.getElementById('sidebar-role').textContent = data.visitorId
         ? `Visitor #${data.visitorId}`

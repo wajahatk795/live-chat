@@ -473,6 +473,7 @@
             prepend = false,
             msgId = null,
             isRead = false,
+            senderName = null,
         ) {
             if (msgId && messages.querySelector(`[data-msg-id="${msgId}"]`)) {
                 return;
@@ -500,8 +501,9 @@
                     🤖 AI Assistant
                 </div>`;
             } else if (isHumanAgent) {
+                const displayName = (senderName && String(senderName).trim()) ? String(senderName).trim() : "Support Agent";
                 senderBadge = `<div style="font-size:10px; font-weight:700; color:#4b5563; margin-bottom:3px; display:flex; align-items:center; gap:3px;">
-                    👤 Support Agent
+                    👤 ${displayName}
                 </div>`;
             }
 
@@ -857,6 +859,7 @@
                         // INITIAL LOAD → latest to oldest
                         data.messages.forEach((msg) => {
                             if (msg.sender === null && !msg.is_ai) return;
+                            const sName = msg.sender_name || (msg.user && msg.user.name) || null;
                             addMsg(
                                 msg.message,
                                 msg.role,
@@ -865,6 +868,7 @@
                                 false,
                                 msg.id,
                                 msg.is_read,
+                                sName,
                             );
                         });
 
@@ -919,6 +923,7 @@
                                 }
                             }
 
+                            const sName = data.sender_name || (data.user && data.user.name) || null;
                             addMsg(
                                 data.message,
                                 data.role,
@@ -927,6 +932,7 @@
                                 false,
                                 data.id,
                                 data.is_read,
+                                sName,
                             );
                             if (box.style.display === "flex") {
                                 fetch(`${BASE_URL}/api/visitor-read`, {
@@ -988,6 +994,7 @@
 
                         // reverse messages so oldest comes first
                         data.messages.reverse().forEach((msg) => {
+                            const sName = msg.sender_name || (msg.user && msg.user.name) || null;
                             addMsg(
                                 msg.message,
                                 msg.role,
@@ -996,6 +1003,7 @@
                                 true,
                                 msg.id,
                                 msg.is_read,
+                                sName,
                             );
                         });
                     }
@@ -1057,7 +1065,7 @@
         }
 
         sendHeartbeat();
-        setInterval(sendHeartbeat, 30000);
+        setInterval(sendHeartbeat, 5000);
 
         ["click", "keydown", "mousemove", "scroll"].forEach((evt) => {
             window.addEventListener(evt, throttle(sendHeartbeat, 60000));

@@ -104,6 +104,8 @@ class ChatHistoryTest extends TestCase
         $visitors = [];
         foreach ([
             ['Online Visitor', now()],
+            ['Recently Online Visitor', now()->subSeconds(9)],
+            ['Recently Offline Visitor', now()->subSeconds(11)],
             ['Offline Visitor', now()->subMinutes(10)],
         ] as [$name, $lastSeenAt]) {
             $visitor = Visitor::create([
@@ -131,29 +133,60 @@ class ChatHistoryTest extends TestCase
             'brand_id' => $brand->id,
             'status' => 'open',
         ]);
+        Chat::create([
+            'visitor_id' => $visitors['Recently Online Visitor'][0]->id,
+            'brand_id' => $brand->id,
+            'status' => 'open',
+        ]);
+        Chat::create([
+            'visitor_id' => $visitors['Recently Offline Visitor'][0]->id,
+            'brand_id' => $brand->id,
+            'status' => 'open',
+        ]);
         $offlineClosedChat = Chat::create([
             'visitor_id' => $visitors['Offline Visitor'][0]->id,
             'brand_id' => $brand->id,
             'status' => 'closed',
+        ]);
+        Message::create([
+            'chat_id' => $onlineChat->id,
+            'sender' => $visitors['Online Visitor'][1]->id,
+            'message' => 'Older visitor preview',
+            'is_read' => false,
+        ]);
+        Message::create([
+            'chat_id' => $onlineChat->id,
+            'sender' => $visitors['Online Visitor'][1]->id,
+            'message' => 'Latest visitor preview',
+            'is_read' => false,
         ]);
 
         $this->actingAs($admin)
             ->get(route('admin.chat', [], false))
             ->assertOk()
             ->assertSee('data-name="Online Visitor"', false)
+            ->assertSee('data-name="Recently Online Visitor"', false)
+            ->assertSee('Latest visitor preview')
+            ->assertDontSee('Older visitor preview')
+            ->assertSee('unread-badge"', false)
+            ->assertSee('>2</span>', false)
+            ->assertDontSee('data-name="Recently Offline Visitor"', false)
             ->assertDontSee('data-name="Offline Visitor"', false);
 
         $this->get(route('admin.chat', ['view' => 'history'], false))
             ->assertOk()
             ->assertSee('History')
+            ->assertSee('data-name="Recently Offline Visitor"', false)
             ->assertSee('data-name="Offline Visitor"', false)
             ->assertDontSee('data-name="Online Visitor"', false)
+            ->assertDontSee('data-name="Recently Online Visitor"', false)
             ->assertSee('data-chat-id="' . $offlineOpenChat->id . '"', false)
             ->assertSee('data-chat-id="' . $offlineClosedChat->id . '"', false);
 
         $this->get(route('admin.chat.contacts', ['view' => 'history'], false))
             ->assertOk()
             ->assertSee('data-name="Offline Visitor"', false)
+            ->assertSee('data-name="Recently Offline Visitor"', false)
             ->assertDontSee('data-name="Online Visitor"', false);
 
         $this->assertNotSame($onlineChat->id, $offlineOpenChat->id);

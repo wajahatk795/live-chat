@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Message;
 use App\Models\Chat;
 use App\Models\Brand;
+use App\Models\Visitor;
 use App\Models\HeatmapEvent;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
@@ -100,11 +101,22 @@ class AdminController extends Controller
 
     private function chatListQuery(bool $historyView)
     {
-        $onlineSince = now()->subMinutes(3);
+        $onlineSince = now()->subSeconds(Visitor::ONLINE_TIMEOUT_SECONDS);
         $userBrandIds = auth()->user()->auth_brands->pluck('id')->toArray();
 
         $query = Chat::with(['visitor', 'main_visitor'])
             ->withMax('messages', 'created_at')
+            ->withCount(['messages as unread_messages_count' => function ($messages) {
+                $messages->where('is_read', false)
+                    ->where('sender', '!=', auth()->id());
+            }])
+            ->addSelect([
+                'last_message_preview' => Message::select('message')
+                    ->whereColumn('chat_id', 'chats.id')
+                    ->whereNotNull('sender')
+                    ->latest()
+                    ->limit(1),
+            ])
             ->when(auth()->user()->role != 1, function ($query) use ($userBrandIds) {
                 $query->whereHas('visitor', function ($visitorQuery) use ($userBrandIds) {
                     $visitorQuery->whereIn('brand_id', $userBrandIds);

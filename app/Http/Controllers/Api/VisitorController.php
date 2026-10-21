@@ -90,6 +90,12 @@ class VisitorController extends Controller
                 'message' => $msg->message,
                 'role' => $msg->is_ai ? 4 : ($msg->user->role ?? $msg->sender),
                 'sender' => $msg->is_ai ? 'ai' : ($msg->sender ?? null),
+                'sender_name' => $msg->is_ai ? 'AI Assistant' : ($msg->user->name ?? 'Support Agent'),
+                'user' => $msg->user ? [
+                    'id' => $msg->user->id,
+                    'name' => $msg->user->name,
+                    'image' => $msg->user->image,
+                ] : null,
                 'is_ai' => (bool)$msg->is_ai,
                 'created_at' => $msg->created_at,
                 'formatted_created_at' => $msg->formatted_created_at,
@@ -225,7 +231,7 @@ class VisitorController extends Controller
         if (!$chat)
             return response()->json(['messages' => []]);
 
-        $messages = Message::where('chat_id', $chat->id)
+        $messages = Message::with('user')->where('chat_id', $chat->id)
             ->where('id', '<', $request->before_id)
             ->where(function ($q) {
                 $q->whereNotNull('sender')->orWhere('is_ai', true);
@@ -244,6 +250,12 @@ class VisitorController extends Controller
                 'role' => $msg->is_ai ? 4 : ($msg->user->role ?? $msg->sender),
                 'sender_role' => $msg->is_ai ? 4 : ($msg->user->role ?? $msg->sender),
                 'sender' => $msg->is_ai ? 'ai' : ($msg->sender ?? null),
+                'sender_name' => $msg->is_ai ? 'AI Assistant' : ($msg->user->name ?? 'Support Agent'),
+                'user' => $msg->user ? [
+                    'id' => $msg->user->id,
+                    'name' => $msg->user->name,
+                    'image' => $msg->user->image,
+                ] : null,
                 'is_ai' => (bool)$msg->is_ai,
                 'created_at' => $msg->created_at,
                 'formatted_created_at' => $msg->formatted_created_at,
@@ -687,7 +699,7 @@ class VisitorController extends Controller
             return response()->json();
 
         $wasOffline = !$visitor->last_seen_at
-            || $visitor->last_seen_at->lt(now()->subMinutes(3));
+            || $visitor->last_seen_at->lt(now()->subSeconds(Visitor::ONLINE_TIMEOUT_SECONDS));
         $visitor->last_seen_at = now();
         $visitor->save();
 
