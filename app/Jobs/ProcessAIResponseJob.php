@@ -7,6 +7,7 @@ use App\Models\Message;
 use App\Models\User;
 use App\Models\Brand;
 use App\Services\Ai\AiServiceFactory;
+use App\Services\AgentPresenceService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -21,11 +22,13 @@ class ProcessAIResponseJob implements ShouldQueue
 
     public $chat;
     public $pendingSince; // The timestamp when ai_pending was set (to avoid stale jobs)
+    public bool $triggerImmediately;
 
-    public function __construct(Chat $chat, ?string $pendingSince = null)
+    public function __construct(Chat $chat, ?string $pendingSince = null, bool $triggerImmediately = false)
     {
         $this->chat = $chat;
         $this->pendingSince = $pendingSince;
+        $this->triggerImmediately = $triggerImmediately;
     }
 
     public function handle()
@@ -42,6 +45,11 @@ class ProcessAIResponseJob implements ShouldQueue
 
         if (!$settings || !$settings->ai_enabled) {
             Log::warning("ProcessAIResponseJob: AI not enabled or settings missing for Chat #{$this->chat->id}, Brand #{$brand?->id}");
+            return;
+        }
+
+        if ($brand && app(AgentPresenceService::class)->hasOnlineAgent($brand)) {
+            Log::info("ProcessAIResponseJob: Online agent is available for Chat #{$this->chat->id}; skipping offline handoff.");
             return;
         }
 
@@ -63,7 +71,7 @@ class ProcessAIResponseJob implements ShouldQueue
             // Verify that the full delay duration has actually passed
             $delaySeconds = $settings->ai_handoff_delay ?? 60;
             $pendingSinceCarbon = Carbon::parse($this->pendingSince);
-            if ($pendingSinceCarbon->copy()->addSeconds($delaySeconds)->isFuture()) {
+            if (!$this->triggerImmediately && $pendingSinceCarbon->copy()->addSeconds($delaySeconds)->isFuture()) {
                 Log::info("ProcessAIResponseJob: Full delay ({$delaySeconds}s) has not elapsed yet for Chat #{$this->chat->id}. Skipping premature response.");
                 return;
             }

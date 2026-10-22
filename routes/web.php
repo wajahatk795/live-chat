@@ -29,7 +29,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-Route::middleware(['auth', 'role:1', 'lastseen'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'role:1'])->prefix('admin')->group(function () {
 
     Route::get('users', [UserController::class, 'index'])->name('admin.users');
     Route::get('users/create', [UserController::class, 'create'])->name('admin.users.create');
@@ -61,7 +61,7 @@ Route::middleware(['auth', 'role:1', 'lastseen'])->prefix('admin')->group(functi
     // Route::delete('website/destroy/{id}', [WebsiteController::class, 'destroy'])->name('admin.website.destroy');
 });
 
-Route::middleware(['auth', 'role:1,2', 'lastseen'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'role:1,2'])->prefix('admin')->group(function () {
 
     Route::get('dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::get('visitor-analytics', [AdminController::class, 'visitorAnalytics'])->name('admin.visitor-analytics');
@@ -81,6 +81,7 @@ Route::middleware(['auth', 'role:1,2', 'lastseen'])->prefix('admin')->group(func
     Route::put('chat-shortcuts/{shortcutId}', [ChatShortcutController::class, 'manageUpdate'])->name('admin.chat-shortcuts.update');
 
     Route::post('send-message', [MessageController::class, 'send'])->name('admin.chat.send');
+    Route::post('agent-presence', [MessageController::class, 'presence'])->name('admin.agent-presence');
     Route::post('chat/start', [MessageController::class, 'chartStart'])->name('admin.chat.start');
     Route::post('chat/typing', [MessageController::class, 'typing'])->name('admin.chat.typing');
     Route::post('chat/mark-read', [MessageController::class, 'markRead'])->name('admin.chat.markRead');
@@ -102,7 +103,7 @@ Route::middleware(['auth', 'role:1,2', 'lastseen'])->prefix('admin')->group(func
     Route::get('visitor/edit-user/{id}', [VisitorController::class, 'editUser'])->name('admin.visitor.edit-user');
 });
 
-Route::middleware(['auth', 'lastseen'])->group(function () {
+Route::middleware(['auth'])->group(function () {
 
     Route::get('/admin/profile', [ProfileController::class, 'profile'])->name('admin.profile.index');
     Route::post('/profile/update', [ProfileController::class, 'updateProfile'])->name('profile.update');
@@ -110,7 +111,7 @@ Route::middleware(['auth', 'lastseen'])->group(function () {
 });
 
 // Form Submissions - server‑side DataTables endpoint and page view
-Route::middleware(['auth', 'lastseen'])->prefix('admin')->group(function () {
+Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::get('form-submissions', [FormSubmissionsController::class, 'index'])->name('admin.form-submissions');
     Route::get('form-submissions/data', [FormSubmissionsController::class, 'getFormSubmissions'])->name('admin.form-submissions.data');
     Route::get('form-submissions/{id}', [FormSubmissionsController::class, 'show'])->name('admin.form-submissions.show');

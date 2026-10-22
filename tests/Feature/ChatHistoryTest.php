@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Brand;
 use App\Models\Chat;
+use App\Models\ChatSetting;
 use App\Models\Message;
 use App\Models\User;
 use App\Models\Visitor;
@@ -70,7 +71,9 @@ class ChatHistoryTest extends TestCase
         $this->get(route('admin.chat', [], false))
             ->assertOk()
             ->assertSee('id="profile-save-button"', false)
-            ->assertSee('Save details');
+            ->assertSee('Save details')
+            ->assertSee('agent-presence')
+            ->assertSee('visibilitychange');
 
         $response = $this
             ->postJson(route('admin.chat.send', [], false), [
@@ -82,6 +85,8 @@ class ChatHistoryTest extends TestCase
             ->assertJsonPath('status', 'sent')
             ->assertJsonPath('message.message', 'Agent reply')
             ->assertJsonPath('message.role', 2)
+            ->assertJsonPath('message.sender_type', 'agent')
+            ->assertJsonPath('message.is_ai', false)
             ->assertJsonPath('message.user.id', $agent->id);
         $this->assertDatabaseHas('messages', [
             'chat_id' => $chat->id,
@@ -89,6 +94,158 @@ class ChatHistoryTest extends TestCase
             'message' => 'Agent reply',
         ]);
         $this->assertNotSame($visitorUser->id, $agent->id);
+    }
+
+    public function test_ai_handoff_does_not_answer_while_an_agent_is_online(): void
+    {
+        config(['services.openai.api_key' => 'test-key']);
+        Http::fake([
+            'api.openai.com/*' => Http::response([
+                'choices' => [['message' => ['content' => 'AI should not answer this chat.']]],
+            ]),
+        ]);
+
+        $brand = Brand::create(['name' => 'Online agent brand', 'status' => 1]);
+        $agent = User::create([
+            'name' => 'Online agent',
+            'email' => 'online-agent-handoff@example.com',
+            'password' => 'password',
+            'role' => 2,
+            'is_online' => 1,
+            'last_seen' => now(),
+        ]);
+        $brand->users()->attach($agent->id);
+        ChatSetting::create([
+            'brand_id' => $brand->id,
+            'chat_position' => 'right',
+            'ai_enabled' => true,
+            'ai_provider' => 'openai',
+            'ai_model' => 'gpt-4o-mini',
+        ]);
+        $visitor = Visitor::create([
+            'brand_id' => $brand->id,
+            'session_id' => 'online-agent-pending-visitor',
+        ]);
+        $visitorUser = User::create([
+            'name' => 'Waiting visitor',
+            'email' => 'online-agent-pending-visitor@example.com',
+            'password' => 'password',
+            'role' => 3,
+            'visitor_id' => $visitor->id,
+        ]);
+        $chat = Chat::create([
+            'visitor_id' => $visitor->id,
+            'brand_id' => $brand->id,
+            'agent_id' => $agent->id,
+            'status' => 'open',
+            'ai_pending' => true,
+            'ai_pending_since' => now()->subMinute(),
+        ]);
+        Message::create([
+            'chat_id' => $chat->id,
+            'sender' => $visitorUser->id,
+            'message' => 'I need support',
+        ]);
+
+        $this->actingAs($agent)
+            ->postJson(route('admin.agent-presence', [], false), [
+                'tab_id' => 'agent-active-chat-tab',
+                'online' => true,
+            ])->assertOk();
+
+        $this->postJson('/api/visitor-ai-trigger', [
+            'session_id' => $visitor->session_id,
+        ])->assertOk()
+            ->assertJsonPath('status', false);
+
+        $this->assertDatabaseMissing('messages', [
+            'chat_id' => $chat->id,
+            'message' => 'AI should not answer this chat.',
+            'is_ai' => true,
+        ]);
+
+        $this->postJson(route('admin.agent-presence', [], false), [
+            'tab_id' => 'agent-second-chat-tab',
+            'online' => true,
+        ])->assertOk();
+        $this->postJson(route('admin.agent-presence', [], false), [
+            'tab_id' => 'agent-active-chat-tab',
+            'online' => false,
+        ])->assertOk();
+
+        $this->postJson('/api/visitor-ai-trigger', [
+            'session_id' => $visitor->session_id,
+        ])->assertOk()
+            ->assertJsonPath('status', false);
+
+        $this->postJson(route('admin.agent-presence', [], false), [
+            'tab_id' => 'agent-second-chat-tab',
+            'online' => false,
+        ])->assertOk();
+        $this->assertDatabaseHas('messages', [
+            'chat_id' => $chat->id,
+            'message' => 'AI should not answer this chat.',
+            'is_ai' => true,
+        ]);
+    }
+
+    public function test_ai_replies_immediately_when_no_agent_chat_tab_is_active(): void
+    {
+        config(['services.openai.api_key' => 'test-key']);
+        Http::fake([
+            'api.openai.com/*' => Http::response([
+                'choices' => [['message' => ['content' => 'AI reply while the agent is offline.']]],
+            ]),
+        ]);
+
+        $brand = Brand::create(['name' => 'Offline agent brand', 'status' => 1]);
+        $staleOnlineAgent = User::create([
+            'name' => 'Agent outside the chat tab',
+            'email' => 'stale-online-agent@example.com',
+            'password' => 'password',
+            'role' => 2,
+            'is_online' => true,
+            'last_seen' => now(),
+        ]);
+        $brand->users()->attach($staleOnlineAgent->id);
+        ChatSetting::create([
+            'brand_id' => $brand->id,
+            'chat_position' => 'right',
+            'ai_enabled' => true,
+            'ai_provider' => 'openai',
+            'ai_model' => 'gpt-4o-mini',
+            'ai_handoff_delay' => 120,
+        ]);
+        $visitor = Visitor::create([
+            'brand_id' => $brand->id,
+            'session_id' => 'offline-agent-immediate-visitor',
+        ]);
+        $visitorUser = User::create([
+            'name' => 'Offline test visitor',
+            'email' => 'offline-agent-immediate@example.com',
+            'password' => 'password',
+            'role' => 3,
+            'visitor_id' => $visitor->id,
+        ]);
+
+        $this->postJson('/api/visitor-message', [
+            'session_id' => $visitor->session_id,
+            'message' => 'I need help now',
+        ])->assertOk()
+            ->assertJsonPath('status', true);
+
+        $chat = Chat::where('visitor_id', $visitor->id)->firstOrFail();
+        $this->assertDatabaseHas('messages', [
+            'chat_id' => $chat->id,
+            'sender' => $visitorUser->id,
+            'message' => 'I need help now',
+        ]);
+        $this->assertDatabaseHas('messages', [
+            'chat_id' => $chat->id,
+            'message' => 'AI reply while the agent is offline.',
+            'is_ai' => true,
+        ]);
+        $this->assertFalse((bool) $chat->fresh()->ai_pending);
     }
 
     public function test_chat_inbox_separates_online_visitors_from_offline_history(): void

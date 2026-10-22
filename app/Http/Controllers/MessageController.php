@@ -6,9 +6,46 @@ use Illuminate\Http\Request;
 use App\Models\Message;
 use App\Models\Chat;
 use App\Events\NewMessage;
+use App\Services\AgentPresenceService;
+use App\Services\Ai\OfflineAgentAiHandoff;
 
 class MessageController extends Controller
 {
+    public function presence(
+        Request $request,
+        AgentPresenceService $presence,
+        OfflineAgentAiHandoff $aiHandoff
+    ) {
+        abort_unless((int) auth()->user()->role === 2, 403);
+
+        $validated = $request->validate([
+            'tab_id' => 'required|string|max:64',
+            'online' => 'required|boolean',
+        ]);
+
+        $agent = auth()->user();
+        $isOnline = (bool) $validated['online'];
+        $presence->update($agent, $validated['tab_id'], $isOnline);
+
+        if (!$isOnline) {
+            $pendingChats = Chat::whereIn(
+                'brand_id',
+                $agent->auth_brands()->pluck('brand.id')
+            )
+                ->where('status', 'open')
+                ->where('ai_pending', true)
+                ->where('ai_processing', false)
+                ->whereNotNull('ai_pending_since')
+                ->get();
+
+            foreach ($pendingChats as $chat) {
+                $aiHandoff->triggerIfNoOnlineAgents($chat);
+            }
+        }
+
+        return response()->json(['status' => true, 'online' => $isOnline]);
+    }
+
     public function send(Request $request)
     {
         abort_unless((int) auth()->user()->role === 2, 403, 'Administrators can view chats but cannot send replies.');
@@ -88,16 +125,20 @@ class MessageController extends Controller
         $messageData = [
             'chat_id' => $chat->id,
             'message' => $msg->message,
-            'role' => auth()->user()->role ?? 2,
+            'role' => (int) (auth()->user()->role ?? 2),
+            'sender' => auth()->id(),
+            'sender_type' => 'agent',
             'formatted_created_at' => $msg->formatted_created_at,
             'created_at' => $msg->created_at,
             'id' => $msg->id,
             'is_read' => (bool) $msg->is_read,
+            'is_ai' => false,
             'sender_name' => auth()->user()->name ?? 'Support Agent',
             'user' => [
                 'id' => auth()->id(),
                 'image' => auth()->user()->image ?? null,
                 'name' => auth()->user()->name ?? '',
+                'role' => (int) (auth()->user()->role ?? 2),
             ],
         ];
 

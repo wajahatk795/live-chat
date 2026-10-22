@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Chat;
+use App\Services\AgentPresenceService;
+use App\Services\Ai\OfflineAgentAiHandoff;
 
 class LoginController extends Controller
 {
@@ -32,10 +35,25 @@ class LoginController extends Controller
 
 
 
-    public function logout(Request $request)
-    {
+    public function logout(
+        Request $request,
+        AgentPresenceService $presence,
+        OfflineAgentAiHandoff $aiHandoff
+    ) {
         $user = auth()->user();
-        $user->update(['is_online' => 0]);
+        $presence->clear($user);
+
+        $pendingChats = Chat::whereIn('brand_id', $user->auth_brands()->pluck('brand.id'))
+            ->where('status', 'open')
+            ->where('ai_pending', true)
+            ->where('ai_processing', false)
+            ->whereNotNull('ai_pending_since')
+            ->get();
+
+        foreach ($pendingChats as $chat) {
+            $aiHandoff->triggerIfNoOnlineAgents($chat);
+        }
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

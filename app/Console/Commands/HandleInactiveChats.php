@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use App\Models\Chat;
 use App\Models\Message;
 use App\Models\User;
+use App\Models\AgentPresence;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Pusher\Pusher;
@@ -33,13 +34,17 @@ class HandleInactiveChats extends Command
     {
         // Log::info('time now: ' . now());
         // Log::info('threshold: ' . now()->subMinutes(2));
-        User::where('role', 2)
-            ->where('last_seen', '<', now()->subMinutes(2))
-            ->update(['is_online' => 0]);
+        AgentPresence::where('last_seen_at', '<', now()->subSeconds(User::ONLINE_TIMEOUT_SECONDS))
+            ->delete();
 
         User::where('role', 2)
-            ->where('last_seen', '>=', now()->subMinutes(2))
-            ->update(['is_online' => 1]);
+            ->with('agentPresences')
+            ->get()
+            ->each(function (User $user) {
+                $isOnline = $user->agentPresences
+                    ->contains(fn (AgentPresence $presence) => $presence->last_seen_at->gte(now()->subSeconds(User::ONLINE_TIMEOUT_SECONDS)));
+                $user->update(['is_online' => $isOnline]);
+            });
 
         return Command::SUCCESS;
         // Log::info('chat:handle-inactive command started');

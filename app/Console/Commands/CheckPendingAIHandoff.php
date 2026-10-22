@@ -8,6 +8,7 @@ use App\Models\Message;
 use App\Models\ChatSetting;
 use App\Jobs\ProcessAIResponseJob;
 use App\Jobs\SendProactiveAIGreetingJob;
+use App\Services\Ai\OfflineAgentAiHandoff;
 use Illuminate\Support\Facades\Log;
 
 class CheckPendingAIHandoff extends Command
@@ -56,6 +57,10 @@ class CheckPendingAIHandoff extends Command
                 continue;
             }
 
+            if (app(OfflineAgentAiHandoff::class)->hasOnlineAgent($chat)) {
+                continue;
+            }
+
             $delaySeconds = $settings->ai_handoff_delay ?? 60;
             $pendingSince = $chat->ai_pending_since ? \Carbon\Carbon::parse($chat->ai_pending_since) : null;
 
@@ -99,6 +104,10 @@ class CheckPendingAIHandoff extends Command
                 continue;
             }
 
+            if (app(OfflineAgentAiHandoff::class)->hasOnlineAgent($chat)) {
+                continue;
+            }
+
             $delaySeconds = $settings->ai_handoff_delay ?? 60;
             $createdAt = $chat->created_at ? \Carbon\Carbon::parse($chat->created_at) : null;
 
@@ -121,4 +130,3 @@ class CheckPendingAIHandoff extends Command
         }
     }
 }
-

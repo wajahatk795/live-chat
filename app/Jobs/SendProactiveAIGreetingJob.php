@@ -7,6 +7,7 @@ use App\Models\Message;
 use App\Models\Brand;
 use App\Models\ChatSetting;
 use App\Services\Ai\AiServiceFactory;
+use App\Services\AgentPresenceService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -57,6 +58,11 @@ class SendProactiveAIGreetingJob implements ShouldQueue
 
         if (!$settings || !$settings->ai_enabled) {
             Log::info("SendProactiveAIGreetingJob: AI not enabled for Chat #{$this->chat->id}. Skipping.");
+            return;
+        }
+
+        if ($brand && app(AgentPresenceService::class)->hasOnlineAgent($brand)) {
+            Log::info("SendProactiveAIGreetingJob: An agent is online for Chat #{$this->chat->id}. Skipping.");
             return;
         }
 

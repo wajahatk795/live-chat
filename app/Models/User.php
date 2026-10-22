@@ -9,6 +9,8 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
+    public const ONLINE_TIMEOUT_SECONDS = 15;
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
@@ -67,6 +69,11 @@ class User extends Authenticatable
     public function assignedChats()
     {
         return $this->hasMany(Chat::class, 'agent_id', 'id');
+    }
+
+    public function agentPresences()
+    {
+        return $this->hasMany(AgentPresence::class);
     }
 
     public function isRole()

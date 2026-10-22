@@ -688,6 +688,67 @@ const historyView = @json($historyView);
 const currentUserRole = @json((int) auth()->user()->role);
 const authorizedBrandIds = @json(auth()->user()->role == 1 ? [] : auth()->user()->auth_brands->pluck('id')->values());
 
+if (currentUserRole === 2) {
+    const presenceTabId = crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
+    let presenceHeartbeat;
+    let presenceRequestInFlight = false;
+    let desiredPresenceOnline = document.visibilityState === 'visible';
+    let desiredPresenceKeepalive = false;
+
+    const updateAgentPresence = (online, keepalive = false) => {
+        desiredPresenceOnline = online;
+        desiredPresenceKeepalive = keepalive;
+        if (presenceRequestInFlight) return;
+
+        presenceRequestInFlight = true;
+        const sendPresenceUpdate = () => {
+            const requestedOnline = desiredPresenceOnline;
+            const requestedKeepalive = desiredPresenceKeepalive;
+
+            fetch("{{ route('admin.agent-presence') }}", {
+                method: 'POST',
+                credentials: 'same-origin',
+                keepalive: requestedKeepalive,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({ tab_id: presenceTabId, online: requestedOnline })
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error(`Agent presence update failed (${response.status}).`);
+                })
+                .catch(error => console.error('Unable to update agent chat presence:', error))
+                .finally(() => {
+                    if (requestedOnline !== desiredPresenceOnline || requestedKeepalive !== desiredPresenceKeepalive) {
+                        sendPresenceUpdate();
+                        return;
+                    }
+                    presenceRequestInFlight = false;
+                });
+        };
+
+        sendPresenceUpdate();
+    };
+
+    const refreshAgentPresence = () => {
+        if (document.visibilityState === 'visible') {
+            updateAgentPresence(true);
+            if (!presenceHeartbeat) presenceHeartbeat = setInterval(() => updateAgentPresence(true), 5000);
+        } else {
+            updateAgentPresence(false, true);
+            clearInterval(presenceHeartbeat);
+            presenceHeartbeat = null;
+        }
+    };
+
+    document.addEventListener('visibilitychange', refreshAgentPresence);
+    window.addEventListener('pagehide', () => updateAgentPresence(false, true));
+    refreshAgentPresence();
+}
+
 function subscribeSidebarChat(element) {
     const id = element.dataset.chatId;
     if (!id || boundSidebarChannels.has(id)) return;
