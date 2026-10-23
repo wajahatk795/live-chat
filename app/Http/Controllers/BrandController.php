@@ -20,7 +20,7 @@ class BrandController extends Controller
 {
     public function index()
     {
-        $brand = Brand::with('user')->get();
+        $brand = $this->brandsQuery()->with('user')->get();
         foreach ($brand as $item) {
             $item->logo = asset($item->logo);
         }
@@ -29,7 +29,7 @@ class BrandController extends Controller
 
     public function getdata()
     {
-        $brand = Brand::select(['id', 'domain', 'url', 'status']);
+        $brand = $this->brandsQuery()->select(['id', 'domain', 'url', 'status']);
 
         return DataTables::of($brand)
             ->addIndexColumn()
@@ -58,7 +58,7 @@ class BrandController extends Controller
 
     public function changeStatus(Request $request)
     {
-        $brand = Brand::findOrFail($request->id);
+        $brand = $this->brandsQuery()->findOrFail($request->id);
 
         $brand->status = $request->status;
         $brand->save();
@@ -71,7 +71,7 @@ class BrandController extends Controller
 
     public function create()
     {
-        $users = User::where('role', 2)->get();
+        $users = User::where('role', 2)->when(auth()->user()->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))->get();
         return view('admin.brand.create', compact('users'));
     }
 
@@ -99,7 +99,10 @@ class BrandController extends Controller
 
             $verifyToken = Str::random(32);
 
-            $brand = Brand::create(array_merge($validator->validated(), ['verify_token' => $verifyToken]));
+            $brand = Brand::create(array_merge($validator->validated(), [
+                'verify_token' => $verifyToken,
+                'company_id' => auth()->user()->company_id,
+            ]));
 
             DB::commit();
 
@@ -115,7 +118,7 @@ class BrandController extends Controller
 
     public function install($id)
     {
-        $brand = Brand::findOrFail($id);
+        $brand = $this->brandsQuery()->findOrFail($id);
         $script = $this->installScript($brand);
 
         return view('admin.brand.install', compact('brand', 'script'));
@@ -150,6 +153,8 @@ class BrandController extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
+        $this->brandsQuery()->findOrFail($request->brand_id);
+
         ChatSetting::updateOrCreate(
             ['brand_id' => $request->brand_id],
             [
@@ -174,10 +179,10 @@ class BrandController extends Controller
 
     public function edit($id)
     {
-        $brand = Brand::findOrFail($id);
+        $brand = $this->brandsQuery()->findOrFail($id);
 
         // 🔥 Sirf visitor_id = 2 wale users
-        $users = User::where('role', 2)->get();
+        $users = User::where('role', 2)->when(auth()->user()->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))->get();
 
         $selectedUserIds = DB::table('brand_users')
             ->where('brand_id', $brand->id)
@@ -208,12 +213,15 @@ class BrandController extends Controller
 
     public function update(Request $request, $id)
     {
-        $brand = Brand::findOrFail($id);
+        $brand = $this->brandsQuery()->findOrFail($id);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'user_ids' => 'required|array',
-            'user_ids.*' => 'required|exists:users,id',
+            'user_ids.*' => [
+                'required',
+                Rule::exists('users', 'id')->when(auth()->user()->company_id, fn ($rule) => $rule->where('company_id', auth()->user()->company_id)),
+            ],
             'email' => 'required|email|max:255',
             'url' => [
                 'required',
@@ -267,7 +275,7 @@ class BrandController extends Controller
 
     public function resyncAi($id)
     {
-        $brand = Brand::findOrFail($id);
+        $brand = $this->brandsQuery()->findOrFail($id);
         TrainBrandAiJob::dispatch($brand);
 
         if (request()->ajax() || request()->wantsJson()) {
@@ -282,9 +290,18 @@ class BrandController extends Controller
 
     public function destroy(Brand $brand)
     {
+        $this->brandsQuery()->findOrFail($brand->id);
         ChatSetting::where('brand_id', $brand->id)->delete();
         $brand->delete();
 
         return redirect()->route('admin.brand')->with('success', 'Brand deleted successfully!');
+    }
+
+    private function brandsQuery()
+    {
+        return Brand::query()->when(
+            auth()->user()->company_id && !auth()->user()->isSuperAdmin(),
+            fn ($query) => $query->where('company_id', auth()->user()->company_id)
+        );
     }
 }

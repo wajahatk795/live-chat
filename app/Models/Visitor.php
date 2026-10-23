@@ -11,6 +11,7 @@ class Visitor extends Model
 
     protected $fillable = [
         'brand_id',
+        'company_id',
         'session_id',
         'last_url',
         'source',
@@ -66,5 +67,10 @@ class Visitor extends Model
     public function brand()
     {
         return $this->belongsTo(Brand::class, 'brand_id', 'id');
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

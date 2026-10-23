@@ -19,7 +19,20 @@ class RoleMiddleware
             return redirect()->route('login');
         }
 
-        if (!in_array(auth()->user()->role, $roles)) {
+        $userRole = (string) auth()->user()->role;
+        $allowedRoles = array_map('strval', $roles);
+
+        $company = auth()->user()->company;
+        if ($company && !$company->is_active && $userRole !== 'super_admin') {
+            abort(403, 'This company account is inactive. Contact your company administrator.');
+        }
+
+        // Super Admin inherits administrator access across the existing panel.
+        if ($userRole === 'super_admin' && in_array('1', $allowedRoles, true)) {
+            return $next($request);
+        }
+
+        if (!in_array($userRole, $allowedRoles, true)) {
             abort(403, 'Unauthorized');
         }
 

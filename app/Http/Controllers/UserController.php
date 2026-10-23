@@ -19,6 +19,7 @@ class UserController extends Controller
     public function getUsers()
     {
         $users = User::where('role', 2)
+            ->when(auth()->user()->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
             ->select(['id', 'name', 'email', 'phone', 'address'])
             ->latest()
             ->get();
@@ -81,6 +82,7 @@ class UserController extends Controller
         $validated = $request->all();
         $validated['visitor_id'] = 2;
         $validated['role'] = 2;
+        $validated['company_id'] = auth()->user()->company_id;
 
         if ($request->hasFile('image')) {
             $file = $request->file('image');
@@ -97,12 +99,12 @@ class UserController extends Controller
     }
     public function edit($id)
     {
-        $user = User::findOrFail($id);
+        $user = $this->findManageableUser($id);
         return view('admin.user.edit', compact('user'));
     }
     public function update(Request $request, $id)
     {
-        $user = User::findOrFail($id);
+        $user = $this->findManageableUser($id);
 
         $validator = Validator::make($request->all(), [
             'name' => [
@@ -149,6 +151,7 @@ class UserController extends Controller
         // Image upload
         $validated['visitor_id'] = 2;
         $validated['role'] = 2;
+        $validated['company_id'] = $user->company_id;
 
         if ($request->hasFile('image')) {
             $file = $request->file('image');
@@ -168,7 +171,14 @@ class UserController extends Controller
     }
     public function destroy($id)
     {
-        User::findOrFail($id)->delete();
+        $this->findManageableUser($id)->delete();
         return redirect()->route('admin.users')->with('success', 'User deleted successfully!');
+    }
+
+    private function findManageableUser(int $id): User
+    {
+        return User::query()
+            ->when(auth()->user()->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
+            ->findOrFail($id);
     }
 }

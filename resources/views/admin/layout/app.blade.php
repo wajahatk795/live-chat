@@ -453,7 +453,8 @@
     <script type="module" src="{{ asset('assets/js/perfect-scrollbar-D2XDwrzR.js') }}"></script>
     <script type="module" src="{{ asset('assets/js/hammer-DLEdXtvS.js') }}"></script>
     <script type="module" src="{{ asset('assets/js/menu-Cc3Gq5JA.js') }}"></script>
-    {{-- <link rel="modulepreload" href="{{ asset('assets/js/main-CGh5h70G.js') }}" /><script type="module" src="{{ asset('assets/js/main-CGh5h70G.js') }}"></script> --}}
+    <link rel="modulepreload" href="{{ asset('assets/js/main-CGh5h70G.js') }}" />
+    <script type="module" src="{{ asset('assets/js/main-CGh5h70G.js') }}"></script>
     <link rel="modulepreload" href="{{ asset('assets/js/app-chat-B0MYhsTQ.js') }}" />
     <script type="module" src="{{ asset('assets/js/app-chat-B0MYhsTQ.js') }}"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">

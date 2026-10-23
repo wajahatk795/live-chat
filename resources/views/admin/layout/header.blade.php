@@ -23,11 +23,23 @@
 
         <ul class="navbar-nav flex-row align-items-center ms-md-auto">
 
+            @if (session()->has('super_admin_impersonator_id'))
+                <li class="nav-item me-2">
+                    <div class="d-flex align-items-center gap-2 rounded-pill border border-warning px-3 py-1 bg-label-warning">
+                        <span class="small fw-semibold text-nowrap"><i class="bx bx-shield-quarter me-1"></i>Viewing {{ auth()->user()->isRole() }} · {{ auth()->user()->company?->name ?? 'Company' }}</span>
+                        <form method="POST" action="{{ route('super-admin.return') }}" class="m-0">
+                            @csrf
+                            <button type="submit" class="btn btn-sm btn-warning text-nowrap"><i class="bx bx-exit me-1"></i>Return to Super Admin</button>
+                        </form>
+                    </div>
+                </li>
+            @endif
+
             <!-- Style Switcher -->
             <li class="nav-item dropdown me-2 me-xl-0">
                 <a class="nav-link dropdown-toggle hide-arrow" id="nav-theme" href="javascript:void(0);"
                     data-bs-toggle="dropdown">
-                    <i class="icon-base bx bx-sun icon-md theme-icon-active"></i>
+                    <svg id="theme-toggle-icon" class="theme-icon-active" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>
                     <span class="d-none ms-2" id="nav-theme-text">Toggle theme</span>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="nav-theme-text">
@@ -214,13 +226,12 @@
                         </li>
                     @else
                         <li>
-                            <a style="display: flex" class="dropdown-item" href="">
-                                <i class="icon-base bx bx-log-in icon-md me-3"></i>
-                                <form method="POST" action="{{ route('logout') }}">
-                                    @csrf
-                                    <button type="submit">Logout</button>
-                                </form>
-                            </a>
+                            <form method="POST" action="{{ session()->has('super_admin_impersonator_id') ? route('super-admin.return') : route('logout') }}" class="m-0">
+                                @csrf
+                <button type="submit" class="dropdown-item">
+                                    <i class="icon-base bx {{ session()->has('super_admin_impersonator_id') ? 'bx-exit' : 'bx-log-out' }} icon-md me-3"></i><span>{{ session()->has('super_admin_impersonator_id') ? 'Return to Super Admin' : 'Logout' }}</span>
+                                </button>
+                            </form>
                         </li>
                     @endif
                 </ul>
@@ -231,18 +242,27 @@
 </nav>
 <script>
     (function() {
-        // Get theme from localStorage or default to 'light'
-        const theme = localStorage.getItem('theme') || 'light';
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        const theme = savedTheme === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : savedTheme;
+        const themeIcon = document.getElementById('theme-toggle-icon');
+        const updateThemeIcon = (activeTheme) => {
+            if (!themeIcon) return;
+            themeIcon.innerHTML = activeTheme === 'dark'
+                ? '<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"></path>'
+                : '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path>';
+        };
 
-        // Apply theme to HTML tag
         document.documentElement.setAttribute('data-bs-theme', theme);
+        updateThemeIcon(theme);
 
         // Update active state in dropdown
         const themeButtons = document.querySelectorAll('[data-bs-theme-value]');
 
         themeButtons.forEach(button => {
             // Mark active button based on current theme
-            if (button.getAttribute('data-bs-theme-value') === theme) {
+            if (button.getAttribute('data-bs-theme-value') === savedTheme) {
                 button.classList.add('active');
             } else {
                 button.classList.remove('active');
@@ -252,9 +272,13 @@
             button.addEventListener('click', function(e) {
                 e.preventDefault();
                 const selectedTheme = this.getAttribute('data-bs-theme-value');
+                const resolvedTheme = selectedTheme === 'system'
+                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                    : selectedTheme;
 
                 // Apply theme
-                document.documentElement.setAttribute('data-bs-theme', selectedTheme);
+                document.documentElement.setAttribute('data-bs-theme', resolvedTheme);
+                updateThemeIcon(resolvedTheme);
 
                 // Save to localStorage
                 localStorage.setItem('theme', selectedTheme);

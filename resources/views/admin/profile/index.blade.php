@@ -76,6 +76,9 @@
                                     <small class="text-muted">Role cannot be changed</small>
                                 </div>
                             @endif
+                            @if(Auth::user()->isSuperAdmin())
+                                <div class="mb-3"><label class="form-label">Role</label><input type="text" class="form-control" value="Super Admin" readonly><small class="text-muted">Role cannot be changed</small></div>
+                            @endif
 
                             <div class="mb-3">
                                 <label class="form-label">Phone</label>
@@ -186,6 +189,9 @@
                                     <p class="mb-1 text-muted">Role</p>
                                     <h6>Agent</h6>
                                 </div>
+                            @endif
+                            @if(Auth::user()->isSuperAdmin())
+                                <div class="col-md-4"><p class="mb-1 text-muted">Role</p><h6>Super Admin</h6></div>
                             @endif
 
                             <div class="col-md-4">

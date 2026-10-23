@@ -9,6 +9,7 @@ class Brand extends Model
     protected $table = 'brand';
     protected $fillable = [
         'name',
+        'company_id',
         'user_id',
         'url',
         'logo',
@@ -28,6 +29,11 @@ class Brand extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function users()

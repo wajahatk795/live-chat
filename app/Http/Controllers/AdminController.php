@@ -18,18 +18,16 @@ class AdminController extends Controller
 {
     public function dashboard(DashboardService $dashboardService)
     {
-        $events = HeatmapEvent::where('brand_id', 8)
-            ->where('url', 'http://localhost/photo-studio/public/login')
-            ->where('type', 'click')
-            ->get();
-
         $user = auth()->user();
-        $brandIds = $user->isRole('admin')
+        $brandIds = $user->isPlatformAdmin()
             ? Brand::pluck('id')->toArray()
-            : $user->auth_brands->pluck('id')->toArray();
+            : ($user->company_id
+                ? Brand::where('company_id', $user->company_id)->pluck('id')->toArray()
+                : $user->auth_brands->pluck('id')->toArray());
 
-        $stats = $dashboardService->getWeeklyStats();
-        $chartData = $dashboardService->getWeeklyChartData();
+        $events = HeatmapEvent::whereIn('brand_id', $brandIds)->where('type', 'click')->get();
+        $stats = $dashboardService->getWeeklyStats('created_at', $user->company_id);
+        $chartData = $dashboardService->getWeeklyChartData('created_at', $user->company_id);
         $bestAgent    = $dashboardService->getBestAgent($brandIds);
         $quickStats   = $dashboardService->getQuickStats($brandIds);
         $responseTime = $dashboardService->getAvgResponseTime($brandIds);
@@ -37,7 +35,7 @@ class AdminController extends Controller
 
         emit_pusher_notification('agent-status', 'agent-online', [
             'agent_id'  => auth()->id(),
-            'brand_ids' => auth()->user()->auth_brands->pluck('id')
+            'brand_ids' => $brandIds
         ]);
 
         return view('admin.dashboard', [
@@ -63,9 +61,11 @@ class AdminController extends Controller
     public function visitorAnalytics(DashboardService $dashboardService)
     {
         $user     = auth()->user();
-        $brandIds = $user->isRole('admin')
+        $brandIds = $user->isPlatformAdmin()
             ? Brand::pluck('id')->toArray()
-            : $user->auth_brands->pluck('id')->toArray();
+            : ($user->company_id
+                ? Brand::where('company_id', $user->company_id)->pluck('id')->toArray()
+                : $user->auth_brands->pluck('id')->toArray());
 
         return response()->json($dashboardService->getVisitorAnalytics($brandIds));
     }
@@ -102,7 +102,10 @@ class AdminController extends Controller
     private function chatListQuery(bool $historyView)
     {
         $onlineSince = now()->subSeconds(Visitor::ONLINE_TIMEOUT_SECONDS);
-        $userBrandIds = auth()->user()->auth_brands->pluck('id')->toArray();
+        $user = auth()->user();
+        $userBrandIds = $user->company_id
+            ? Brand::where('company_id', $user->company_id)->pluck('id')->toArray()
+            : $user->auth_brands->pluck('id')->toArray();
 
         $query = Chat::with(['visitor', 'main_visitor'])
             ->withMax('messages', 'created_at')
@@ -117,7 +120,7 @@ class AdminController extends Controller
                     ->latest()
                     ->limit(1),
             ])
-            ->when(auth()->user()->role != 1, function ($query) use ($userBrandIds) {
+            ->when(!auth()->user()->isPlatformAdmin(), function ($query) use ($userBrandIds) {
                 $query->whereHas('visitor', function ($visitorQuery) use ($userBrandIds) {
                     $visitorQuery->whereIn('brand_id', $userBrandIds);
                 });
@@ -209,7 +212,7 @@ class AdminController extends Controller
 
     public function show($chatId)
     {
-        $chat = Chat::with(['visitor', 'main_visitor'])->findOrFail($chatId);
+        $chat = $this->accessibleChats()->with(['visitor', 'main_visitor'])->findOrFail($chatId);
         $readOnly = request()->boolean('past');
         $visitorId = Chat::where('id', $chatId)->value('visitor_id');
         $user = User::with('get_chat')->where('visitor_id', $visitorId)->first();
@@ -219,7 +222,7 @@ class AdminController extends Controller
 
     public function chatProfile($chatId)
     {
-        $chat = Chat::with('main_visitor')->findOrFail($chatId);
+        $chat = $this->accessibleChats()->with('main_visitor')->findOrFail($chatId);
         $this->authorizeChatProfile($chat);
 
         $visitor = $chat->main_visitor;
@@ -320,7 +323,7 @@ class AdminController extends Controller
     {
         abort_unless((int) auth()->user()->role === 2, 403, 'Administrators can view visitor profiles but cannot update them.');
 
-        $chat = Chat::with('main_visitor')->findOrFail($chatId);
+        $chat = $this->accessibleChats()->with('main_visitor')->findOrFail($chatId);
         $this->authorizeChatProfile($chat);
         abort_unless($chat->main_visitor, 404);
         $user = User::where('visitor_id', $chat->visitor_id)->firstOrFail();
@@ -364,9 +367,24 @@ class AdminController extends Controller
     {
         $user = auth()->user();
         abort_unless(
-            $user->role == 1 || $user->auth_brands()->where('brand.id', $chat->brand_id)->exists(),
+            $user->isPlatformAdmin()
+                || ($user->company_id && (int) $chat->brand?->company_id === (int) $user->company_id)
+                || $user->auth_brands()->where('brand.id', $chat->brand_id)->exists(),
             403
         );
+    }
+
+    private function accessibleChats()
+    {
+        $user = auth()->user();
+
+        return Chat::query()->when(!$user->isPlatformAdmin(), function ($query) use ($user) {
+            if ($user->company_id) {
+                $query->whereHas('brand', fn ($brands) => $brands->where('company_id', $user->company_id));
+            } else {
+                $query->whereIn('brand_id', $user->auth_brands()->pluck('brand.id'));
+            }
+        });
     }
 
     private function wherePastChatActivity($query, Carbon $cutoff): void
@@ -406,7 +424,7 @@ class AdminController extends Controller
         $prepend = $request->boolean('prepend');
         $cutoff = now()->subWeek();
 
-        $chat = Chat::with(['visitor', 'main_visitor'])->find($chatId);
+        $chat = $this->accessibleChats()->with(['visitor', 'main_visitor'])->findOrFail($chatId);
 
         $messageQuery = Message::with('user')
             ->where('chat_id', $chatId);

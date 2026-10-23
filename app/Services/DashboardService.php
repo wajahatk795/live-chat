@@ -12,12 +12,13 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
-    public function getWeeklyChartData(string $column = 'created_at'): array
+    public function getWeeklyChartData(string $column = 'created_at', ?int $companyId = null): array
     {
         $startOfWeek = Carbon::now()->startOfWeek();
         $endOfWeek   = Carbon::now()->endOfWeek();
 
         $countsByDay = User::whereBetween($column, [$startOfWeek, $endOfWeek])
+            ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->selectRaw("DATE($column) as date_val, COUNT(*) as count")
             ->groupBy('date_val')
             ->pluck('count', 'date_val')
@@ -29,11 +30,11 @@ class DashboardService
         })->toArray();
     }
 
-    public function getWeeklyStats(string $column = 'created_at'): array
+    public function getWeeklyStats(string $column = 'created_at', ?int $companyId = null): array
     {
-        $thisWeek = $this->getWeekCount($column, Carbon::now());
-        $lastWeek = $this->getWeekCount($column, Carbon::now()->subWeek());
-        $totalUsers = User::count();
+        $thisWeek = $this->getWeekCount($column, Carbon::now(), $companyId);
+        $lastWeek = $this->getWeekCount($column, Carbon::now()->subWeek(), $companyId);
+        $totalUsers = User::when($companyId, fn ($query) => $query->where('company_id', $companyId))->count();
 
         return [
             'percent' => $totalUsers > 0
@@ -46,12 +47,12 @@ class DashboardService
         ];
     }
 
-    private function getWeekCount(string $column, Carbon $date): int
+    private function getWeekCount(string $column, Carbon $date, ?int $companyId = null): int
     {
         return User::whereBetween($column, [
             $date->copy()->startOfWeek(),
             $date->copy()->endOfWeek()
-        ])->count();
+        ])->when($companyId, fn ($query) => $query->where('company_id', $companyId))->count();
     }
 
     public function getBestAgent(array $brandIds): array

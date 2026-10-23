@@ -1,4 +1,4 @@
-<aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
+<aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme {{ auth()->user()->isSuperAdmin() ? 'super-admin-menu' : '' }}">
 
     <!-- ! Hide app brand if navbar-full -->
     <div class="app-brand demo">
@@ -49,7 +49,7 @@
                     </svg>
                 </span>
             </span>
-            <span class="app-brand-text demo menu-text fw-bold ms-2">sneat</span>
+            <span class="app-brand-text demo menu-text fw-bold ms-2">{{ auth()->user()->isSuperAdmin() ? 'Control Center' : 'sneat' }}</span>
         </a>
 
         <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto">
@@ -59,10 +59,27 @@
 
     <div class="menu-inner-shadow"></div>
 
+    @if(auth()->user()->isSuperAdmin())
+        <div class="super-admin-badge mx-4 mt-3 mb-2">
+            <span class="super-admin-badge-icon"><i class="bx bx-shield-quarter"></i></span>
+            <span><strong>Super Admin</strong><small>Full access</small></span>
+        </div>
+    @endif
+
     <ul class="menu-inner py-1">
         @php
             $currentRoute = Route::currentRouteName();
         @endphp
+
+        @if(auth()->user()->isSuperAdmin())
+            <li class="menu-header small text-uppercase"><span class="menu-header-text">SaaS Management</span></li>
+            <li class="menu-item {{ request()->routeIs('admin.super-admin.companies.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.super-admin.companies.index') }}" class="menu-link">
+                    <i class="menu-icon bx bx-buildings"></i>
+                    <div>Companies</div>
+                </a>
+            </li>
+        @else
 
         <!-- Dashboard -->
         <li class="menu-item {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
@@ -97,7 +114,7 @@
         @endif
 
         <!-- Agent/Users (including create, edit, show, etc) -->
-        @if(auth()->user()->role == 1)
+        @if(auth()->user()->isAdministrator())
             <li class="menu-item {{ request()->routeIs('admin.users*') ? 'active' : '' }}">
                 <a href="{{ route('admin.users') }}" class="menu-link">
                     <i class="menu-icon bx bx-user"></i>
@@ -123,7 +140,7 @@
         </li>
 
         <!-- Brand (including create, edit, show, etc) -->
-        @if(auth()->user()->role == 1)
+        @if(auth()->user()->isAdministrator())
             <li class="menu-item {{ request()->routeIs('admin.brand*') ? 'active' : '' }}">
                 <a href="{{ route('admin.brand') }}" class="menu-link">
                     <i class="menu-icon bx bxs-business"></i>
@@ -137,6 +154,7 @@
                 <div>Form Submissions</div>
             </a>
         </li>
+        @endif
     </ul>
 
 </aside>

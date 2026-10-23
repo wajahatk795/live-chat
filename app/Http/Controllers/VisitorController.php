@@ -25,7 +25,8 @@ class VisitorController extends Controller
     public function getdata()
     {
         $visitors = Visitor::with(['user', 'brand'])
-            ->select(['id', 'brand_id', 'created_at']);
+            ->when(auth()->user()->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
+            ->select(['id', 'brand_id', 'company_id', 'created_at']);
 
         return DataTables::of($visitors)
             ->addIndexColumn()
@@ -77,7 +78,7 @@ class VisitorController extends Controller
         abort_unless((int) auth()->user()->role === 2, 403, 'Administrators can view visitor profiles but cannot update them.');
 
         // Sirf visitor ka data lao with user
-        $visitor = Visitor::with(['user'])->findOrFail($id);
+        $visitor = Visitor::with(['user'])->when(auth()->user()->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))->findOrFail($id);
 
         return view('admin.visitor.edit', compact('visitor'));
     }
@@ -89,7 +90,7 @@ class VisitorController extends Controller
     {
         abort_unless((int) auth()->user()->role === 2, 403, 'Administrators can view visitor profiles but cannot update them.');
 
-        $visitor = Visitor::with('user')->findOrFail($id);
+        $visitor = Visitor::with('user')->when(auth()->user()->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))->findOrFail($id);
 
         $validator = Validator::make($request->all(), [
             'email' => [
@@ -168,7 +169,7 @@ class VisitorController extends Controller
     public function destroy($id)
     {
         try {
-            $visitor = Visitor::findOrFail($id);
+        $visitor = Visitor::when(auth()->user()->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))->findOrFail($id);
             $visitor->delete();
 
             return redirect()->route('admin.visitor')

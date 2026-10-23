@@ -342,7 +342,9 @@ class VisitorController extends Controller
                 $brand->is_verified = true;
                 $brand->save();
 
-                $admin = User::where('role', 1)->first();
+                $admin = User::where('role', 1)
+                    ->when($brand->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))
+                    ->first() ?? User::where('role', 1)->first();
 
                 // send notification to admin
                 $admin->notify(new BrandApprovalRequest($brand));
@@ -361,6 +363,13 @@ class VisitorController extends Controller
             ]);
         }
 
+        if ($brand->company && !$brand->company->is_active) {
+            return response()->json([
+                'status' => 'inactive',
+                'message' => 'This company subscription is inactive.',
+            ], 403);
+        }
+
         $userIds = $brand->users->pluck('id')->toArray();
 
         $sessionId = $request->session_id;
@@ -368,7 +377,7 @@ class VisitorController extends Controller
         // 2️⃣ Visitor
         $visitor = Visitor::firstOrCreate(
             ['session_id' => $request->session_id],
-            ['brand_id' => $brand->id] //website is like brand_id
+            ['brand_id' => $brand->id, 'company_id' => $brand->company_id] //website is like brand_id
         );
 
         if ($visitor->wasRecentlyCreated || (!$visitor->source && !$visitor->keyword)) {
@@ -397,7 +406,8 @@ class VisitorController extends Controller
                 'name' => 'Visitor-' . $visitor->id,
                 'email' => 'visitor' . $visitor->id . '@example.com',
                 'password' => bcrypt(Str::random(8)), // random password
-                'role' => 3
+                'role' => 3,
+                'company_id' => $brand->company_id,
             ]
         );
 

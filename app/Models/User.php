@@ -24,6 +24,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'company_id',
         'phone',
         'about',
         'address',
@@ -79,13 +80,35 @@ class User extends Authenticatable
     public function isRole()
     {
         $role = $this->role;
-        if ($role == 1) {
+        if ((string) $role === 'super_admin') {
+            return 'Super Admin';
+        } elseif ($role == 1) {
             return 'Admin';
         } elseif ($role == 2) {
             return 'Agent';
         } else {
             return 'Visitor';
         }
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
+    public function isAdministrator(): bool
+    {
+        return in_array((string) $this->role, ['1', 'super_admin'], true);
+    }
+
+    public function isPlatformAdmin(): bool
+    {
+        return $this->isSuperAdmin() || ((int) $this->role === 1 && $this->company_id === null);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function brands()

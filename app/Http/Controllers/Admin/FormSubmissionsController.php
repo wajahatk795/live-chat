@@ -17,7 +17,7 @@ class FormSubmissionsController extends Controller
     public function index()
     {
         // Brand dropdown for filter UI – data fetched via AJAX for the table.
-        $brands = Brand::pluck('name', 'id');
+        $brands = Brand::when(auth()->user()->company_id, fn ($query, $companyId) => $query->where('company_id', $companyId))->pluck('name', 'id');
         return view('admin.form-submissions.index', compact('brands'));
     }
 
@@ -30,7 +30,10 @@ class FormSubmissionsController extends Controller
         $user = User::with('auth_brands')->where('id', $user_id)->first();
         $brand_ids = $user->auth_brands->pluck('id')->toArray();
 
-        if (auth()->user()->role != 1) {
+        if (auth()->user()->company_id) {
+            $companyBrandIds = Brand::where('company_id', auth()->user()->company_id)->pluck('id');
+            $query = FormSubmission::with('brand')->whereIn('brand_id', $companyBrandIds)->latest();
+        } elseif (!auth()->user()->isAdministrator()) {
             $query = FormSubmission::with('brand')->whereIn('brand_id', $brand_ids)->latest();
         } else {
             $query = FormSubmission::with('brand')->latest();
@@ -70,7 +73,11 @@ class FormSubmissionsController extends Controller
      */
     public function show($id)
     {
-        $submission = FormSubmission::with('brand')->findOrFail($id);
+        $submission = FormSubmission::with('brand')
+            ->when(auth()->user()->company_id, function ($query, $companyId) {
+                $query->whereHas('brand', fn ($brands) => $brands->where('company_id', $companyId));
+            })
+            ->findOrFail($id);
         return view('admin.form-submissions.show', compact('submission'));
     }
 }

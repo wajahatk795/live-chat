@@ -535,13 +535,13 @@
                         <form id="visitor-profile-form" class="chat-profile-section">
                             <input type="hidden" id="profile-visitor-id">
                             <label class="form-label small mb-1" for="profile-name">Name</label>
-                            <input class="form-control form-control-sm chat-profile-input" id="profile-name" name="name" maxlength="255" placeholder="Add name" required @if((int) auth()->user()->role === 1) readonly @endif>
+                        <input class="form-control form-control-sm chat-profile-input" id="profile-name" name="name" maxlength="255" placeholder="Add name" required @if(auth()->user()->isAdministrator()) readonly @endif>
                             <label class="form-label small mb-1" for="profile-email">Email</label>
-                            <input class="form-control form-control-sm chat-profile-input" id="profile-email" name="email" type="email" maxlength="255" placeholder="Add email" @if((int) auth()->user()->role === 1) readonly @endif>
+                            <input class="form-control form-control-sm chat-profile-input" id="profile-email" name="email" type="email" maxlength="255" placeholder="Add email" @if(auth()->user()->isAdministrator()) readonly @endif>
                             <label class="form-label small mb-1" for="profile-phone">Phone</label>
-                            <input class="form-control form-control-sm chat-profile-input" id="profile-phone" name="phone" maxlength="30" placeholder="Add phone number" @if((int) auth()->user()->role === 1) readonly @endif>
+                            <input class="form-control form-control-sm chat-profile-input" id="profile-phone" name="phone" maxlength="30" placeholder="Add phone number" @if(auth()->user()->isAdministrator()) readonly @endif>
                             <label class="form-label small mb-1" for="profile-notes">Visitor notes</label>
-                            <textarea class="form-control form-control-sm chat-profile-input" id="profile-notes" name="notes" rows="3" maxlength="5000" placeholder="Add visitor notes" @if((int) auth()->user()->role === 1) readonly @endif></textarea>
+                            <textarea class="form-control form-control-sm chat-profile-input" id="profile-notes" name="notes" rows="3" maxlength="5000" placeholder="Add visitor notes" @if(auth()->user()->isAdministrator()) readonly @endif></textarea>
                             @if((int) auth()->user()->role === 2)
                                 <button class="btn btn-sm btn-primary w-100" type="submit" id="profile-save-button">Save details</button>
                             @endif
@@ -686,7 +686,12 @@ const profileUpdateRoute = "{{ route('admin.chat.profile.update', ':id') }}";
 const chatContactsUrl = @json(route('admin.chat.contacts'));
 const historyView = @json($historyView);
 const currentUserRole = @json((int) auth()->user()->role);
-const authorizedBrandIds = @json(auth()->user()->role == 1 ? [] : auth()->user()->auth_brands->pluck('id')->values());
+const authorizedBrandIds = @json(auth()->user()->isPlatformAdmin()
+    ? []
+    : (auth()->user()->company_id
+        ? \App\Models\Brand::where('company_id', auth()->user()->company_id)->pluck('id')->values()
+        : auth()->user()->auth_brands->pluck('id')->values()));
+const isPlatformAdmin = @json(auth()->user()->isPlatformAdmin());
 
 if (currentUserRole === 2) {
     const presenceTabId = crypto.randomUUID
@@ -815,7 +820,7 @@ async function refreshChatContacts() {
 document.addEventListener('DOMContentLoaded', function () {
 
     pusherChat.subscribe('admin-notifications').bind('visitor-online', data => {
-        const isAuthorized = currentUserRole === 1
+        const isAuthorized = isPlatformAdmin
             || authorizedBrandIds.map(Number).includes(Number(data.brand?.id));
         if (!isAuthorized) return;
 
@@ -823,7 +828,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     pusherChat.subscribe('admin-notifications').bind('visitor-offline', data => {
-        const isAuthorized = currentUserRole === 1
+        const isAuthorized = isPlatformAdmin
             || authorizedBrandIds.map(Number).includes(Number(data.brand?.id));
         if (!isAuthorized) return;
 

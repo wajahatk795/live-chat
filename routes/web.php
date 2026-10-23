@@ -12,9 +12,14 @@ use App\Http\Controllers\BrandController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\VisitorController;
 use App\Http\Controllers\Admin\FormSubmissionsController;
+use App\Http\Controllers\Admin\SuperAdminCompanyController;
 
 
 Route::get('/', function () {
+    if (auth()->check() && auth()->user()->isSuperAdmin()) {
+        return redirect()->route('admin.super-admin.companies.index');
+    }
+
     return auth()->check()
         ? redirect()->route('admin.dashboard')
         : redirect()->route('login');
@@ -28,6 +33,8 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->post('/logout', [LoginController::class, 'logout'])->name('logout');
+Route::middleware('auth')->post('/super-admin/return', [LoginController::class, 'returnFromImpersonation'])->name('super-admin.return');
+Route::middleware('auth')->post('/super-admin/switch-user/{member}', [SuperAdminCompanyController::class, 'switchImpersonatedUser'])->name('super-admin.switch-user');
 
 Route::middleware(['auth', 'role:1'])->prefix('admin')->group(function () {
 
@@ -59,6 +66,21 @@ Route::middleware(['auth', 'role:1'])->prefix('admin')->group(function () {
     // Route::get('website/edit/{id}', [WebsiteController::class, 'edit'])->name('admin.website.edit');
     // Route::put('website/update/{id}', [WebsiteController::class, 'update'])->name('admin.website.update');
     // Route::delete('website/destroy/{id}', [WebsiteController::class, 'destroy'])->name('admin.website.destroy');
+});
+
+Route::middleware(['auth', 'role:super_admin'])->prefix('admin')->group(function () {
+    Route::get('super-admin', fn () => redirect()->route('admin.super-admin.companies.index'));
+    Route::get('companies', [SuperAdminCompanyController::class, 'index'])->name('admin.super-admin.companies.index');
+    Route::get('companies/create', [SuperAdminCompanyController::class, 'create'])->name('admin.super-admin.companies.create');
+    Route::post('companies', [SuperAdminCompanyController::class, 'store'])->name('admin.super-admin.companies.store');
+    Route::post('companies/{company}/impersonate/{member}', [SuperAdminCompanyController::class, 'impersonate'])->name('admin.super-admin.companies.impersonate');
+    Route::get('companies/{company}/visitors', [SuperAdminCompanyController::class, 'visitors'])->name('admin.super-admin.companies.visitors');
+    Route::get('companies/{company}/conversations', [SuperAdminCompanyController::class, 'conversations'])->name('admin.super-admin.companies.conversations');
+    Route::get('companies/{company}', [SuperAdminCompanyController::class, 'show'])->name('admin.super-admin.companies.show');
+    Route::get('companies/{company}/edit', [SuperAdminCompanyController::class, 'edit'])->name('admin.super-admin.companies.edit');
+    Route::put('companies/{company}', [SuperAdminCompanyController::class, 'update'])->name('admin.super-admin.companies.update');
+    Route::patch('companies/{company}/status', [SuperAdminCompanyController::class, 'toggle'])->name('admin.super-admin.companies.toggle');
+    Route::delete('companies/{company}', [SuperAdminCompanyController::class, 'destroy'])->name('admin.super-admin.companies.destroy');
 });
 
 Route::middleware(['auth', 'role:1,2'])->prefix('admin')->group(function () {

@@ -1,4 +1,12 @@
 <div class="dropdown">
+    @if(session()->has('super_admin_impersonator_id'))
+        <form action="{{ route('super-admin.switch-user', $user->id) }}" method="POST" class="d-inline me-1">
+            @csrf
+            <button type="submit" class="btn btn-sm btn-label-primary" title="Super Admin: open this agent workspace">
+                <i class="bx bx-log-in-circle me-1"></i>Login as Agent
+            </button>
+        </form>
+    @endif
     <button type="button" class="btn btn-sm btn-icon btn-text-secondary rounded-pill dropdown-toggle hide-arrow" data-bs-toggle="dropdown">
         <i class="bx bx-dots-vertical-rounded"></i>
     </button>
