@@ -759,7 +759,7 @@ function subscribeSidebarChat(element) {
     if (!id || boundSidebarChannels.has(id)) return;
 
     boundSidebarChannels.add(id);
-    pusherChat.subscribe(`chat.${id}`).bind('new-message', data => {
+    pusherChat.subscribe(@json(pusher_channel_name('chat.')) + id).bind('new-message', data => {
         if (data.role != 3) return;
 
         if (!isChatActive(id)) {
@@ -819,7 +819,7 @@ async function refreshChatContacts() {
 
 document.addEventListener('DOMContentLoaded', function () {
 
-    pusherChat.subscribe('admin-notifications').bind('visitor-online', data => {
+    pusherChat.subscribe(@json(pusher_channel_name('admin-notifications'))).bind('visitor-online', data => {
         const isAuthorized = isPlatformAdmin
             || authorizedBrandIds.map(Number).includes(Number(data.brand?.id));
         if (!isAuthorized) return;
@@ -827,7 +827,7 @@ document.addEventListener('DOMContentLoaded', function () {
         refreshChatContacts();
     });
 
-    pusherChat.subscribe('admin-notifications').bind('visitor-offline', data => {
+    pusherChat.subscribe(@json(pusher_channel_name('admin-notifications'))).bind('visitor-offline', data => {
         const isAuthorized = isPlatformAdmin
             || authorizedBrandIds.map(Number).includes(Number(data.brand?.id));
         if (!isAuthorized) return;
@@ -844,13 +844,16 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.chat-user').forEach(subscribeSidebarChat);
     bindVisitorAvatarFallbacks(document);
     bindCountryFlagFallbacks(document);
-    setInterval(refreshChatContacts, 10000);
+    setInterval(refreshChatContacts, 5000);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') refreshChatContacts();
+    });
 });
 
 // ================= Active chat messages =================
 
 function subscribeToChat(chatId) {
-    chatChannel = pusherChat.subscribe(`chat.${chatId}`);
+    chatChannel = pusherChat.subscribe(@json(pusher_channel_name('chat.')) + chatId);
     const chatKey = String(chatId);
     if (boundChatChannels.has(chatKey)) return;
     boundChatChannels.add(chatKey);

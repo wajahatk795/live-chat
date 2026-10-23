@@ -1,5 +1,15 @@
 <?php
 
+$appUrlHost = strtolower((string) parse_url((string) env('APP_URL', ''), PHP_URL_HOST));
+$isLocalAppUrl = $appUrlHost === ''
+    || $appUrlHost === 'localhost'
+    || $appUrlHost === '127.0.0.1'
+    || $appUrlHost === '::1'
+    || str_ends_with($appUrlHost, '.localhost')
+    || str_ends_with($appUrlHost, '.local')
+    || str_ends_with($appUrlHost, '.test');
+$defaultPusherChannelPrefix = $isLocalAppUrl ? 'local' : 'production';
+
 return [
 
     /*
@@ -48,6 +58,9 @@ return [
 
         'pusher' => [
             'driver' => 'pusher',
+            // Infer local/live from APP_URL so a live deployment with APP_ENV=local
+            // still matches the production widget channel namespace.
+            'channel_prefix' => env('PUSHER_CHANNEL_PREFIX', $defaultPusherChannelPrefix),
             'key' => env('PUSHER_APP_KEY'),
             'secret' => env('PUSHER_APP_SECRET'),
             'app_id' => env('PUSHER_APP_ID'),

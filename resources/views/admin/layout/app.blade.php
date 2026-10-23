@@ -2,7 +2,7 @@
 
 <html lang="en" class="layout-navbar-fixed layout-compact layout-menu-fixed   " dir="ltr" data-skin="default"
     data-assets-path="" data-base-url="" data-framework="laravel" data-template="vertical-menu-template"
-    data-bs-theme="dark">
+    data-bs-theme="light">
 
 <head>
     <meta charset="utf-8" />
@@ -640,10 +640,10 @@
             });
 
             // 3️⃣ Pusher listener for new notifications
-            var pusher = new Pusher("{{ env('PUSHER_APP_KEY') }}", {
-                cluster: "{{ env('PUSHER_APP_CLUSTER') }}"
+            var pusher = new Pusher(@json(config('broadcasting.connections.pusher.key')), {
+                cluster: @json(config('broadcasting.connections.pusher.options.cluster'))
             });
-            var channel = pusher.subscribe('admin-notifications');
+            var channel = pusher.subscribe(@json(pusher_channel_name('admin-notifications')));
             const dock = document.getElementById('chat-minimized-dock');
             const dockToast = document.getElementById('chat-dock-toast');
             const dockWindow = document.getElementById('chat-dock-window');
@@ -784,7 +784,7 @@
                 }
 
                 if (dockChannels.has(key)) {
-                    pusher.unsubscribe(`chat.${key}`);
+                    pusher.unsubscribe(@json(pusher_channel_name('chat.')) + key);
                     dockChannels.delete(key);
                 }
             }
@@ -966,7 +966,7 @@
                 if (dockChannels.has(key)) return;
 
                 dockChannels.add(key);
-                pusher.subscribe(`chat.${key}`).bind('new-message', data => {
+                pusher.subscribe(@json(pusher_channel_name('chat.')) + key).bind('new-message', data => {
                     const isVisitorMessage = Number(data.role) === 3 || data.sender_type === 'visitor';
                     const chatPagePath = new URL(chatRoute, window.location.origin).pathname.replace(/\/+$/, '');
                     const isChatPage = window.location.pathname.replace(/\/+$/, '') === chatPagePath;

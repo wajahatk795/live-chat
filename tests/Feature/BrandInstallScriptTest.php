@@ -36,7 +36,7 @@ class BrandInstallScriptTest extends TestCase
             config(['app.url' => $appUrl]);
             $view = app(BrandController::class)->install($brand->id);
             $expected = '<!--Start of Live Chat -->
-    <script src="' . $expectedBase . '/widget/widget.js?brand=' . $brand->id . '"></script>
+    <script src="' . $expectedBase . '/widget.js?brand=' . $brand->id . '"></script>
     <!-- End of Live Chat -->';
 
             $normalizeLines = fn (string $value) => str_replace(["\r\n", "\r"], "\n", $value);

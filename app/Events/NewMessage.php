@@ -35,7 +35,7 @@ class NewMessage
      */
     public function broadcastOn(): array
     {
-        return new Channel('chat.' . $this->chatId);
+        return new Channel(pusher_channel_name('chat.' . $this->chatId));
     }
 
     public function broadcastAs()

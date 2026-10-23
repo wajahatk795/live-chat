@@ -42,7 +42,7 @@ function emit_pusher_notification($channel, $event, $data): bool
             return false;
         }
 
-        $pusher->trigger($channel, $event, $data);
+        $pusher->trigger(pusher_channel_name($channel), $event, $data);
         return true;
     } catch (\Throwable $e) {
         \Illuminate\Support\Facades\Log::error('Pusher Notification Error: ' . $e->getMessage());
@@ -62,6 +62,11 @@ function emit_pusher_batch(array $events): bool
             return false;
         }
 
+        $events = array_map(static function (array $event): array {
+            $event['channel'] = pusher_channel_name($event['channel']);
+            return $event;
+        }, $events);
+
         $pusher->triggerBatch($events);
         return true;
     } catch (\Throwable $e) {
@@ -70,11 +75,28 @@ function emit_pusher_batch(array $events): bool
         $success = true;
         foreach ($events as $ev) {
             try {
-                $pusher->trigger($ev['channel'], $ev['name'], $ev['data']);
+                $pusher->trigger(pusher_channel_name($ev['channel']), $ev['name'], $ev['data']);
             } catch (\Throwable $ex) {
                 $success = false;
             }
         }
         return $success;
     }
+}
+
+/** Add an environment namespace so local and live deployments never share channels. */
+function pusher_channel_name(string $channel): string
+{
+    $prefix = pusher_channel_prefix();
+
+    return $prefix === '' ? $channel : $prefix . '.' . $channel;
+}
+
+function pusher_channel_prefix(): string
+{
+    $environment = preg_replace('/[^a-zA-Z0-9_-]/', '-', (string) config('app.env', 'production'));
+
+    $prefix = config('broadcasting.connections.pusher.channel_prefix', $environment);
+
+    return trim((string) $prefix, '-_');
 }

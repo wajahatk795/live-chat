@@ -674,7 +674,6 @@ class VisitorController extends Controller
             return response()->json(['status' => false]);
 
         $visitor->last_url = $request->url;
-        $visitor->last_seen_at = now();
         $visitor->save();
 
         $chat = Chat::where('visitor_id', $visitor->id)->where('status', 'open')->first();

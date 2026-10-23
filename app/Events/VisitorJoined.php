@@ -35,7 +35,7 @@ class VisitorJoined implements ShouldBroadcast
      */
     public function broadcastOn()
     {
-        return ['admin-notifications'];
+        return [pusher_channel_name('admin-notifications')];
     }
 
     public function broadcastAs()

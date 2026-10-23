@@ -22,7 +22,8 @@
 
     const WEBSITE_DOMAIN = window.location.hostname;
     let currentUrl = window.location.href;
-    const BASE_URL = new URL("..", document.currentScript.src).href.replace(/\/$/, "");
+    const scriptUrl = new URL(document.currentScript.src);
+    const BASE_URL = `${scriptUrl.origin}${scriptUrl.pathname.replace(/\/(?:widget\/)?(?:live-)?widget\.js$/, "")}`;
 
     let SESSION_ID = localStorage.getItem("chat_session_id");
     if (!SESSION_ID) {
@@ -31,8 +32,10 @@
     }
     sessionStorage.setItem("chat_session_id", SESSION_ID);
 
-    const PUSHER_KEY = "6d2b8f974bbba728216c";
-    const PUSHER_CLUSTER = "ap1";
+    const PUSHER_KEY = document.currentScript.dataset.pusherKey || "6d2b8f974bbba728216c";
+    const PUSHER_CLUSTER = document.currentScript.dataset.pusherCluster || "ap1";
+    const PUSHER_CHANNEL_PREFIX = document.currentScript.dataset.pusherPrefix || "local";
+    const pusherChannel = (name) => `${PUSHER_CHANNEL_PREFIX}.${name}`;
     const API_URL = `${BASE_URL}/api/visitor-message`;
 
     const emojiScript = document.createElement("script");
@@ -107,7 +110,7 @@
         /* ================= agent online/offline status ================= */
         let agentsOnline = false;
 
-        const agentChannel = pusher.subscribe("agent-status");
+        const agentChannel = pusher.subscribe(pusherChannel("agent-status"));
 
         agentChannel.bind("agent-online", function(data){
             console.log("Agent online event received:", data, window.BRAND_ID);
@@ -883,7 +886,7 @@
                         if (channel) {
                             pusher.unsubscribe(channel.name);
                         }
-                        channel = pusher.subscribe(`chat.${data.chat_id}`);
+                        channel = pusher.subscribe(pusherChannel(`chat.${data.chat_id}`));
                         channel.bind("new-message", (data) => {
                             console.log(data);
                             if (data.sender === null && !data.is_ai) return;

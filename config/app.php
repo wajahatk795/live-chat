@@ -125,4 +125,5 @@ return [
 
 
     'script_url' => env('SCRIPT_URL'),
+    'widget' => env('WIDGET', 'widget.js'),
 ];

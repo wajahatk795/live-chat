@@ -203,7 +203,7 @@ class BrandController extends Controller
 
     private function installScript(Brand $brand): string
     {
-        $scriptUrl = rtrim(config('app.url'), '/') . '/widget/widget.js';
+        $scriptUrl = rtrim(config('app.url'), '/') . '/widget.js';
 
         return '<!--Start of Live Chat -->
     <script src="' . $scriptUrl . '?brand=' . $brand->id . '"></script>

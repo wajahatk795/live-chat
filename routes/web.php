@@ -141,8 +141,31 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 
 
 Route::get('/widget.js', function () {
-    return response()->file(public_path('widget/widget.js'), [
-        'Content-Type' => 'application/javascript'
+    $widgetName = basename((string) config('app.widget', 'widget.js'));
+    if (!in_array($widgetName, ['widget.js', 'live-widget.js'], true)) {
+        $widgetName = 'widget.js';
+    }
+
+    $widget = file_get_contents(public_path('widget/' . $widgetName));
+    $widget = str_replace(
+        'document.currentScript.dataset.pusherKey',
+        json_encode(config('broadcasting.connections.pusher.key')),
+        $widget
+    );
+    $widget = str_replace(
+        'document.currentScript.dataset.pusherCluster',
+        json_encode(config('broadcasting.connections.pusher.options.cluster')),
+        $widget
+    );
+    $widget = str_replace(
+        'document.currentScript.dataset.pusherPrefix',
+        json_encode(pusher_channel_prefix()),
+        $widget
+    );
+
+    return response($widget, 200, [
+        'Content-Type' => 'application/javascript',
+        'Cache-Control' => 'no-cache, no-store, must-revalidate',
     ]);
 });
 
